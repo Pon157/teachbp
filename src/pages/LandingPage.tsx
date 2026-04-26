@@ -1,0 +1,239 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+import { RefreshCcw, ArrowRight, ShieldCheck, UserPlus, LogIn } from 'lucide-react';
+import { cn } from '../lib/utils';
+
+export default function LandingPage() {
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
+  const [captcha, setCaptcha] = useState<{ id: string; question: string } | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    surname: '',
+    email: '',
+    password: '',
+    captchaAnswer: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) navigate('/dashboard');
+    refreshCaptcha();
+  }, [user]);
+
+  const refreshCaptcha = async () => {
+    const res = await fetch('/api/captcha');
+    const data = await res.json();
+    setCaptcha(data);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (isLogin) {
+        await login({ email: formData.email, password: formData.password });
+      } else {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            captchaId: captcha?.id
+          })
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Registration failed');
+        }
+        await login({ email: formData.email, password: formData.password });
+      }
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+      refreshCaptcha();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden font-sans text-slate-900">
+      {/* Left side - Info */}
+      <div className="md:w-1/2 p-8 md:p-16 flex flex-col justify-center bg-white border-r border-slate-200">
+        <motion.div 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="max-w-md"
+        >
+          <div className="w-14 h-14 bg-indigo-600 rounded-2xl mb-10 flex items-center justify-center shadow-xl shadow-indigo-200">
+            <span className="text-white font-bold text-3xl">B</span>
+          </div>
+          <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-8 tracking-tighter text-slate-900">
+            BotSupport<span className="text-indigo-600">.Edu</span>
+          </h1>
+          <p className="text-slate-500 text-xl mb-12 leading-relaxed font-medium">
+            Профессиональная экосистема для развития навыков кураторства и проектирования диалоговых систем.
+          </p>
+          <div className="space-y-4">
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center space-x-4">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Официальный сертификат</p>
+                <p className="text-xs text-slate-500 font-medium tracking-tight">Подтверждение квалификации после курса</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex items-center space-x-4">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                <UserPlus size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Личный наставник</p>
+                <p className="text-xs text-slate-500 font-medium tracking-tight">Прямая связь с куратором 24/7</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Right side - Form */}
+      <div className="md:w-1/2 p-8 md:p-16 flex items-center justify-center bg-slate-50 relative">
+        {/* Decorative elements */}
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-indigo-500/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-emerald-500/5 blur-[120px] rounded-full" />
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-2xl relative z-10"
+        >
+          <div className="flex justify-center mb-10">
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full">
+              <button 
+                onClick={() => setIsLogin(true)}
+                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", isLogin ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
+              >
+                Вход
+              </button>
+              <button 
+                onClick={() => setIsLogin(false)}
+                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", !isLogin ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
+              >
+                Регистрация
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isLogin ? 'login' : 'register'}
+                initial={{ opacity: 0, x: isLogin ? -10 : 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: isLogin ? 10 : -10 }}
+                className="space-y-4"
+              >
+                {!isLogin && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Имя</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="Иван"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                        value={formData.name}
+                        onChange={e => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Фамилия</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="Иванов"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                        value={formData.surname}
+                        onChange={e => setFormData({...formData, surname: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Электронная почта</label>
+                  <input 
+                    required 
+                    type="email" 
+                    placeholder="example@edu.ru"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                    value={formData.email}
+                    onChange={e => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Пароль</label>
+                  <input 
+                    required 
+                    type="password" 
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                    value={formData.password}
+                    onChange={e => setFormData({...formData, password: e.target.value})}
+                  />
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="pt-2">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Проверка (капча): {captcha?.question}</span>
+                  <button type="button" onClick={refreshCaptcha} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                    <RefreshCcw size={14} />
+                  </button>
+                </div>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Введите ответ"
+                  className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
+                  value={formData.captchaAnswer}
+                  onChange={e => setFormData({...formData, captchaAnswer: e.target.value})}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs text-center font-bold uppercase tracking-tight bg-red-50 py-2 rounded-lg">{error}</motion.p>
+            )}
+
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center space-x-3 group transition-all shadow-lg shadow-indigo-100 active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? <RefreshCcw size={20} className="animate-spin" /> : (
+                <>
+                  <span>{isLogin ? 'Войти в систему' : 'Присоединиться'}</span>
+                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <p className="mt-8 text-center text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">
+            © 2026 BotSupport Platform
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

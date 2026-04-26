@@ -11,7 +11,8 @@ import {
   Shield, 
   Trophy,
   Activity,
-  ChevronRight
+  ChevronRight,
+  RefreshCcw
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';

@@ -10,6 +10,7 @@ import EditorPage from './pages/EditorPage';
 import AdminPanel from './pages/AdminPanel';
 import MessagesPage from './pages/MessagesPage';
 import VerifyCertificate from './pages/VerifyCertificate';
+import NotFound from './pages/NotFound';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode, roles?: string[] }) {
   const { user, loading } = useAuth();
@@ -56,6 +57,7 @@ export default function App() {
               </ProtectedRoute>
             } />
           </Route>
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

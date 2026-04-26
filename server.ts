@@ -135,10 +135,16 @@ async function startServer() {
     });
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+    
+    // Determine cookie security based on protocol
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: true, 
-      sameSite: 'none'
+      secure: isHttps, 
+      sameSite: isHttps ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
     res.json({ message: 'Success' });
   });
@@ -158,12 +164,54 @@ async function startServer() {
     }
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: true, 
-      sameSite: 'none'
+      secure: isHttps, 
+      sameSite: isHttps ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/'
     });
     res.json({ message: 'Success' });
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    emailCodes.set(`reset:${email}`, { code, expires: Date.now() + 10 * 60 * 1000 });
+
+    try {
+      await sendEmail(
+        email,
+        'Сброс пароля BotSupport',
+        `<h1>Сброс пароля</h1><p>Ваш код для сброса пароля: <b>${code}</b></p><p>Код действителен 10 минут.</p>`
+      );
+      res.json({ message: 'Код сброса отправлен на почту' });
+    } catch (err) {
+      res.status(500).json({ error: 'Ошибка при отправке почты' });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    const { email, code, newPassword } = req.body;
+    
+    const stored = emailCodes.get(`reset:${email}`);
+    if (!stored || stored.code !== code || stored.expires < Date.now()) {
+      return res.status(400).json({ error: 'Неверный или просроченный код' });
+    }
+    emailCodes.delete(`reset:${email}`);
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
+
+    res.json({ message: 'Пароль успешно изменен' });
   });
 
   app.post('/api/auth/logout', (req, res) => {

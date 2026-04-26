@@ -15,8 +15,10 @@ export default function LandingPage() {
     surname: '',
     email: '',
     password: '',
+    code: '',
     captchaAnswer: ''
   });
+  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +33,29 @@ export default function LandingPage() {
     setCaptcha(data);
   };
 
+  const sendCode = async () => {
+    if (!formData.email) return setError('Введите email');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email })
+      });
+      if (res.ok) {
+        setCodeSent(true);
+        setError('');
+      } else {
+        const data = await res.json();
+        setError(data.error);
+      }
+    } catch (err) {
+      setError('Ошибка сети');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -38,8 +63,18 @@ export default function LandingPage() {
 
     try {
       if (isLogin) {
-        await login({ email: formData.email, password: formData.password });
+        await login({ 
+          email: formData.email, 
+          password: formData.password,
+          captchaId: captcha?.id,
+          captchaAnswer: formData.captchaAnswer
+        });
       } else {
+        if (!codeSent) {
+          await sendCode();
+          setLoading(false);
+          return;
+        }
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -192,24 +227,48 @@ export default function LandingPage() {
               </motion.div>
             </AnimatePresence>
 
-            <div className="pt-2">
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Проверка (капча): {captcha?.question}</span>
-                  <button type="button" onClick={refreshCaptcha} className="text-slate-400 hover:text-indigo-600 transition-colors">
-                    <RefreshCcw size={14} />
-                  </button>
-                </div>
-                <input 
-                  required 
-                  type="text" 
-                  placeholder="Введите ответ"
-                  className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
-                  value={formData.captchaAnswer}
-                  onChange={e => setFormData({...formData, captchaAnswer: e.target.value})}
-                />
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Капча: {captcha?.question}</span>
+                <button type="button" onClick={refreshCaptcha} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                  <RefreshCcw size={14} />
+                </button>
               </div>
+              <input 
+                required 
+                type="text" 
+                placeholder="Ответ"
+                className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
+                value={formData.captchaAnswer}
+                onChange={e => setFormData({...formData, captchaAnswer: e.target.value})}
+              />
             </div>
+
+            {!isLogin && (
+              <div className="pt-2">
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Код из почты</span>
+                    <button 
+                      type="button" 
+                      onClick={sendCode} 
+                      disabled={loading || !formData.email}
+                      className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                    >
+                      {codeSent ? 'Отправить еще раз' : 'Получить код'}
+                    </button>
+                  </div>
+                  <input 
+                    required 
+                    type="text" 
+                    placeholder="6-значный код"
+                    className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
+                    value={formData.code}
+                    onChange={e => setFormData({...formData, code: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
 
             {error && (
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs text-center font-bold uppercase tracking-tight bg-red-50 py-2 rounded-lg">{error}</motion.p>

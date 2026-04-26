@@ -45,7 +45,9 @@ export default function Dashboard() {
     fetchData();
   }, [user]);
 
-  const stats = JSON.parse(user?.stats || '{"completedCourses": 0, "totalArticles": 0, "rank": "Новичок"}');
+  const stats = typeof user?.stats === 'string' 
+    ? JSON.parse(user.stats) 
+    : (user?.stats || { completedCourses: 0, totalArticles: 0, rank: "Новичок" });
 
   const [generatingCert, setGeneratingCert] = useState(false);
 

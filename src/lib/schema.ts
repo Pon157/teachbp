@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
 
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   surname: text('surname').notNull(),
@@ -12,11 +12,11 @@ export const users = sqliteTable('users', {
   curatorId: text('curator_id').references(() => users.id),
   theme: text('theme').default('light'),
   language: text('language').default('ru'),
-  stats: text('stats'), // JSON string: { completedCourses: number, totalArticles: number, rank: string }
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  stats: jsonb('stats'), // { completedCourses: number, totalArticles: number, rank: string }
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const courses = sqliteTable('courses', {
+export const courses = pgTable('courses', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
@@ -24,10 +24,10 @@ export const courses = sqliteTable('courses', {
   status: text('status').$type<'draft' | 'pending' | 'published'>().default('draft'),
   estimatedTime: text('estimated_time'),
   imageUrl: text('image_url'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const courseBlocks = sqliteTable('course_blocks', {
+export const courseBlocks = pgTable('course_blocks', {
   id: text('id').primaryKey(),
   courseId: text('course_id').notNull().references(() => courses.id),
   title: text('title').notNull(),
@@ -35,43 +35,43 @@ export const courseBlocks = sqliteTable('course_blocks', {
   order: integer('order').notNull(),
 });
 
-export const homeworks = sqliteTable('homeworks', {
+export const homeworks = pgTable('homeworks', {
   id: text('id').primaryKey(),
   blockId: text('block_id').notNull().references(() => courseBlocks.id),
   description: text('description').notNull(),
 });
 
-export const userProgress = sqliteTable('user_progress', {
+export const userProgress = pgTable('user_progress', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   blockId: text('block_id').notNull().references(() => courseBlocks.id),
   status: text('status').$type<'unlocked' | 'completed'>().default('unlocked'),
   homeworkResponse: text('homework_response'),
   grade: text('grade'), // 'accepted', 'rejected', null
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const notifications = sqliteTable('notifications', {
+export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   message: text('message').notNull(),
   type: text('type').notNull(), // 'course_pass', 'new_message', 'new_block', 'curator_assigned'
-  read: integer('read', { mode: 'boolean' }).default(false),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  read: boolean('read').default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const messages = sqliteTable('messages', {
+export const messages = pgTable('messages', {
   id: text('id').primaryKey(),
   senderId: text('sender_id').notNull().references(() => users.id),
   receiverId: text('receiver_id').notNull().references(() => users.id),
   content: text('content').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const certificates = sqliteTable('certificates', {
+export const certificates = pgTable('certificates', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
   courseIds: text('course_ids').notNull(), // JSON string: string[]
   shareId: text('share_id').notNull().unique(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

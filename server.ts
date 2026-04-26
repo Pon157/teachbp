@@ -54,7 +54,7 @@ async function startServer() {
     }
     captchas.delete(captchaId);
 
-    const existingUser = await db.select().from(users).where(eq(users.email, email)).get();
+    const existingUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (existingUser) return res.status(400).json({ error: 'Email уже занят' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -87,7 +87,7 @@ async function startServer() {
     }
     if (captchaId) captchas.delete(captchaId);
 
-    const user = await db.select().from(users).where(eq(users.email, email)).get();
+    const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
@@ -103,7 +103,7 @@ async function startServer() {
   });
 
   app.get('/api/auth/me', authenticate, async (req: any, res) => {
-    const user = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'User not found' });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
@@ -117,7 +117,7 @@ async function startServer() {
   });
 
   app.get('/api/users/:id', authenticate, async (req, res) => {
-    const user = await db.select().from(users).where(eq(users.id, req.params.id)).get();
+    const user = (await db.select().from(users).where(eq(users.id, req.params.id)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'User not found' });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
@@ -125,14 +125,14 @@ async function startServer() {
 
   // --- Admin Routes ---
   app.get('/api/admin/users', authenticate, async (req: any, res) => {
-    const admin = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const admin = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (admin?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const allUsers = await db.select().from(users);
     res.json(allUsers.map(({ password: _, ...u }) => u));
   });
 
   app.post('/api/admin/assign-role', authenticate, async (req: any, res) => {
-    const admin = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const admin = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (admin?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const { userId, role } = req.body;
     await db.update(users).set({ role }).where(eq(users.id, userId));
@@ -140,7 +140,7 @@ async function startServer() {
   });
 
   app.post('/api/admin/assign-curator', authenticate, async (req: any, res) => {
-    const admin = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const admin = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (admin?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const { studentId, curatorId } = req.body;
     await db.update(users).set({ curatorId }).where(eq(users.id, studentId));
@@ -173,7 +173,7 @@ async function startServer() {
   });
 
   app.post('/api/courses', authenticate, async (req: any, res) => {
-    const user = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (user?.role !== 'teacher' && user?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     
     const { title, description, estimatedTime, imageUrl } = req.body;
@@ -192,14 +192,14 @@ async function startServer() {
   });
 
   app.get('/api/courses/:id', authenticate, async (req, res) => {
-    const course = await db.select().from(courses).where(eq(courses.id, req.params.id)).get();
+    const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
     const blocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.id)).orderBy(courseBlocks.order);
     res.json({ ...course, blocks });
   });
 
   app.post('/api/courses/:id/blocks', authenticate, async (req: any, res) => {
-    const user = await db.select().from(users).where(eq(users.id, req.userId)).get();
-    const course = await db.select().from(courses).where(eq(courses.id, req.params.id)).get();
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
     if (course?.authorId !== req.userId && user?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     
     const { title, content, order } = req.body;
@@ -209,7 +209,7 @@ async function startServer() {
   });
 
   app.post('/api/courses/:id/publish', authenticate, async (req: any, res) => {
-    const user = await db.select().from(users).where(eq(users.id, req.userId)).get();
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (user?.role !== 'admin') return res.status(403).json({ error: 'Only admin can approve courses' });
     
     await db.update(courses).set({ status: 'published' }).where(eq(courses.id, req.params.id));
@@ -309,9 +309,9 @@ async function startServer() {
   });
 
   app.get('/api/verify-certificate/:shareId', async (req, res) => {
-    const cert = await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).get();
+    const cert = (await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).limit(1))[0];
     if (!cert) return res.status(404).json({ error: 'Certificate not found' });
-    const user = await db.select().from(users).where(eq(users.id, cert.userId)).get();
+    const user = (await db.select().from(users).where(eq(users.id, cert.userId)).limit(1))[0];
     res.json({ cert, user: { name: user?.name, surname: user?.surname, avatar: user?.avatar } });
   });
 

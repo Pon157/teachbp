@@ -14,7 +14,9 @@ import { eq, and, or, desc } from 'drizzle-orm';
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
 
 async function startServer() {
-  await initDb();
+  // Initialize DB in background to prevent hanging server startup
+  initDb().catch(err => console.error('Critical DB init error:', err));
+  
   const app = express();
   const PORT = 3000;
 
@@ -23,32 +25,49 @@ async function startServer() {
   app.use(cookieParser());
  
   // --- Email Transporter ---
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  let transporter: nodemailer.Transporter | null = null;
+  
+  if (process.env.SMTP_USER) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
 
   const sendEmail = async (to: string, subject: string, html: string) => {
-    if (!process.env.SMTP_USER) {
+    if (!transporter) {
       console.log('------------------------------------------');
-      console.log(`[EMAIL SIMULATION]`);
-      console.log(`To: ${to}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`Content: ${html}`);
+      console.log(`[EMAIL SIMULATION] To: ${to}, Subject: ${subject}`);
+      console.log(`Content snippet: ${html.substring(0, 100)}...`);
+      // Extract code for easy access in dev
+      const codeMatch = html.match(/<b>(\d+)<\/b>/);
+      if (codeMatch) console.log(`[CODE]: ${codeMatch[1]}`);
       console.log('------------------------------------------');
       return;
     }
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@botsupport.edu',
-      to,
-      subject,
-      html,
-    });
+    
+    try {
+      const mailPromise = transporter.sendMail({
+        from: process.env.SMTP_FROM || 'noreply@botsupport.edu',
+        to,
+        subject,
+        html,
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timed out')), 8000)
+      );
+
+      await Promise.race([mailPromise, timeoutPromise]);
+    } catch (err) {
+      console.error('Nodemailer error:', err);
+      throw err;
+    }
   };
 
   // --- Auth Middleware ---
@@ -136,13 +155,10 @@ async function startServer() {
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
     
-    // Determine cookie security based on protocol
-    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: isHttps, 
-      sameSite: isHttps ? 'none' : 'lax',
+      secure: true, 
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
@@ -165,12 +181,10 @@ async function startServer() {
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
     
-    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-    
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: isHttps, 
-      sameSite: isHttps ? 'none' : 'lax',
+      secure: true, 
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });

@@ -8,7 +8,8 @@ import {
   ChevronRight, 
   Trophy,
   Users,
-  Star
+  Star,
+  RefreshCcw
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Course, User } from '../types';

@@ -11,7 +11,7 @@ export interface User {
   curatorId?: string;
   theme: 'light' | 'dark';
   language: string;
-  stats?: string; // JSON string
+  stats?: any; // JSON object
   createdAt: string;
 }
 

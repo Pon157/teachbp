@@ -9,6 +9,7 @@ export default function LandingPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [captcha, setCaptcha] = useState<{ id: string; question: string } | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -16,11 +17,13 @@ export default function LandingPage() {
     email: '',
     password: '',
     code: '',
-    captchaAnswer: ''
+    captchaAnswer: '',
+    newPassword: ''
   });
   const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (user) navigate('/dashboard');
@@ -28,25 +31,32 @@ export default function LandingPage() {
   }, [user]);
 
   const refreshCaptcha = async () => {
-    const res = await fetch('/api/captcha');
-    const data = await res.json();
-    setCaptcha(data);
+    try {
+      const res = await fetch('/api/captcha');
+      const data = await res.json();
+      setCaptcha(data);
+    } catch (err) {
+      console.error('Captcha refresh failed', err);
+    }
   };
 
   const sendCode = async () => {
     if (!formData.email) return setError('Введите email');
     setLoading(true);
+    setSuccess('');
     try {
-      const res = await fetch('/api/auth/send-code', {
+      const endpoint = isForgotPassword ? '/api/auth/forgot-password' : '/api/auth/send-code';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email })
       });
+      const data = await res.json();
       if (res.ok) {
         setCodeSent(true);
         setError('');
+        setSuccess(data.message || 'Код отправлен');
       } else {
-        const data = await res.json();
         setError(data.error);
       }
     } catch (err) {
@@ -60,21 +70,48 @@ export default function LandingPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
+      if (isForgotPassword) {
+        if (!codeSent) {
+          await sendCode();
+          return;
+        }
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            code: formData.code,
+            newPassword: formData.newPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to reset password');
+        setSuccess('Пароль успешно изменен. Теперь вы можете войти.');
+        setIsForgotPassword(false);
+        setIsLogin(true);
+        setCodeSent(false);
+        return;
+      }
+
       if (isLogin) {
+        console.log('Attempting login for:', formData.email);
         await login({ 
           email: formData.email, 
           password: formData.password,
           captchaId: captcha?.id,
           captchaAnswer: formData.captchaAnswer
         });
+        navigate('/dashboard');
       } else {
         if (!codeSent) {
           await sendCode();
           setLoading(false);
           return;
         }
+        console.log('Attempting registration for:', formData.email);
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -83,14 +120,15 @@ export default function LandingPage() {
             captchaId: captcha?.id
           })
         });
+        const data = await res.json();
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error || 'Registration failed');
         }
         await login({ email: formData.email, password: formData.password });
+        navigate('/dashboard');
       }
-      navigate('/dashboard');
     } catch (err: any) {
+      console.error('Auth error:', err);
       setError(err.message);
       refreshCaptcha();
     } finally {
@@ -153,14 +191,14 @@ export default function LandingPage() {
           <div className="flex justify-center mb-10">
             <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full">
               <button 
-                onClick={() => setIsLogin(true)}
-                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", isLogin ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
+                onClick={() => { setIsLogin(true); setIsForgotPassword(false); setCodeSent(false); }}
+                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", isLogin && !isForgotPassword ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
               >
                 Вход
               </button>
               <button 
-                onClick={() => setIsLogin(false)}
-                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", !isLogin ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
+                onClick={() => { setIsLogin(false); setIsForgotPassword(false); setCodeSent(false); }}
+                className={cn("flex-1 py-3 rounded-xl text-sm font-bold transition-all", !isLogin && !isForgotPassword ? "bg-white text-indigo-600 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600")}
               >
                 Регистрация
               </button>
@@ -170,81 +208,139 @@ export default function LandingPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <AnimatePresence mode="wait">
               <motion.div
-                key={isLogin ? 'login' : 'register'}
-                initial={{ opacity: 0, x: isLogin ? -10 : 10 }}
+                key={isForgotPassword ? 'forgot' : (isLogin ? 'login' : 'register')}
+                initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: isLogin ? 10 : -10 }}
+                exit={{ opacity: 0, x: -10 }}
                 className="space-y-4"
               >
-                {!isLogin && (
-                  <div className="grid grid-cols-2 gap-4">
+                {isForgotPassword ? (
+                  <>
+                    <h2 className="text-xl font-black text-slate-800 mb-2">Сброс пароля</h2>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Имя</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Электронная почта</label>
                       <input 
                         required 
-                        type="text" 
-                        placeholder="Иван"
+                        type="email" 
+                        placeholder="example@edu.ru"
                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
-                        value={formData.name}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
+                      />
+                    </div>
+                    {codeSent && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Код из письма</label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="6-значный код"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                            value={formData.code}
+                            onChange={e => setFormData({...formData, code: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Новый пароль</label>
+                          <input 
+                            required 
+                            type="password" 
+                            placeholder="••••••••"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                            value={formData.newPassword}
+                            onChange={e => setFormData({...formData, newPassword: e.target.value})}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!isLogin && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Имя</label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="Иван"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                            value={formData.name}
+                            onChange={e => setFormData({...formData, name: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Фамилия</label>
+                          <input 
+                            required 
+                            type="text" 
+                            placeholder="Иванов"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                            value={formData.surname}
+                            onChange={e => setFormData({...formData, surname: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Электронная почта</label>
+                      <input 
+                        required 
+                        type="email" 
+                        placeholder="example@edu.ru"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
+                        value={formData.email}
+                        onChange={e => setFormData({...formData, email: e.target.value})}
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Фамилия</label>
+                      <div className="flex justify-between items-center px-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Пароль</label>
+                        {isLogin && (
+                          <button 
+                            type="button" 
+                            onClick={() => { setIsForgotPassword(true); setCodeSent(false); setError(''); setSuccess(''); }}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-tight"
+                          >
+                            Забыли?
+                          </button>
+                        )}
+                      </div>
                       <input 
                         required 
-                        type="text" 
-                        placeholder="Иванов"
+                        type="password" 
+                        placeholder="••••••••"
                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
-                        value={formData.surname}
-                        onChange={e => setFormData({...formData, surname: e.target.value})}
+                        value={formData.password}
+                        onChange={e => setFormData({...formData, password: e.target.value})}
                       />
                     </div>
-                  </div>
+                  </>
                 )}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Электронная почта</label>
-                  <input 
-                    required 
-                    type="email" 
-                    placeholder="example@edu.ru"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
-                    value={formData.email}
-                    onChange={e => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Пароль</label>
-                  <input 
-                    required 
-                    type="password" 
-                    placeholder="••••••••"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 transition-all outline-none" 
-                    value={formData.password}
-                    onChange={e => setFormData({...formData, password: e.target.value})}
-                  />
-                </div>
               </motion.div>
             </AnimatePresence>
 
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Капча: {captcha?.question}</span>
-                <button type="button" onClick={refreshCaptcha} className="text-slate-400 hover:text-indigo-600 transition-colors">
-                  <RefreshCcw size={14} />
-                </button>
+            {!isForgotPassword && (
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Капча: {captcha?.question}</span>
+                  <button type="button" onClick={refreshCaptcha} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                    <RefreshCcw size={14} />
+                  </button>
+                </div>
+                <input 
+                  required 
+                  type="text" 
+                  placeholder="Ответ"
+                  className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
+                  value={formData.captchaAnswer}
+                  onChange={e => setFormData({...formData, captchaAnswer: e.target.value})}
+                />
               </div>
-              <input 
-                required 
-                type="text" 
-                placeholder="Ответ"
-                className="w-full bg-white border border-slate-100 rounded-xl px-4 py-2 text-sm font-medium focus:ring-1 focus:ring-indigo-600 outline-none shadow-inner" 
-                value={formData.captchaAnswer}
-                onChange={e => setFormData({...formData, captchaAnswer: e.target.value})}
-              />
-            </div>
+            )}
 
-            {!isLogin && (
+            {!isLogin && !isForgotPassword && (
               <div className="pt-2">
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
@@ -274,6 +370,10 @@ export default function LandingPage() {
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs text-center font-bold uppercase tracking-tight bg-red-50 py-2 rounded-lg">{error}</motion.p>
             )}
 
+            {success && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-emerald-600 text-xs text-center font-bold uppercase tracking-tight bg-emerald-50 py-2 rounded-lg">{success}</motion.p>
+            )}
+
             <button 
               type="submit" 
               disabled={loading}
@@ -281,12 +381,25 @@ export default function LandingPage() {
             >
               {loading ? <RefreshCcw size={20} className="animate-spin" /> : (
                 <>
-                  <span>{isLogin ? 'Войти в систему' : 'Присоединиться'}</span>
+                  <span>
+                    {isForgotPassword 
+                      ? (codeSent ? 'Сбросить пароль' : 'Получить код сброса') 
+                      : (isLogin ? 'Войти в систему' : 'Присоединиться')}
+                  </span>
                   <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
+
+          {isForgotPassword && (
+            <button 
+              onClick={() => { setIsForgotPassword(false); setIsLogin(true); setCodeSent(false); setError(''); setSuccess(''); }}
+              className="w-full mt-4 text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest"
+            >
+              Вернуться ко входу
+            </button>
+          )}
 
           <p className="mt-8 text-center text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">
             © 2026 BotSupport Platform

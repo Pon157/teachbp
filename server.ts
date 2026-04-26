@@ -5,6 +5,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
 import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks } from './src/lib/schema.ts';
@@ -20,6 +21,35 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
   app.use(cookieParser());
+ 
+  // --- Email Transporter ---
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_PORT === '465',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  const sendEmail = async (to: string, subject: string, html: string) => {
+    if (!process.env.SMTP_USER) {
+      console.log('------------------------------------------');
+      console.log(`[EMAIL SIMULATION]`);
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Content: ${html}`);
+      console.log('------------------------------------------');
+      return;
+    }
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@botsupport.edu',
+      to,
+      subject,
+      html,
+    });
+  };
 
   // --- Auth Middleware ---
   const authenticate = (req: any, res: any, next: any) => {
@@ -34,8 +64,10 @@ async function startServer() {
     }
   };
 
-  // --- Captcha ---
+  // --- Captcha & Email Codes ---
   const captchas = new Map<string, string>();
+  const emailCodes = new Map<string, { code: string, expires: number }>();
+
   app.get('/api/captcha', (req, res) => {
     const id = uuidv4();
     const num1 = Math.floor(Math.random() * 10);
@@ -45,14 +77,42 @@ async function startServer() {
     res.json({ id, question: `Сколько будет ${num1} + ${num2}?` });
   });
 
+  app.post('/api/auth/send-code', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+ 
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
+ 
+    try {
+      await sendEmail(
+        email, 
+        'Код подтверждения BotSupport', 
+        `<h1>Добро пожаловать в BotSupport!</h1><p>Ваш код подтверждения: <b>${code}</b></p><p>Код действителен 10 минут.</p>`
+      );
+      res.json({ message: 'Код отправлен на почту' });
+    } catch (err) {
+      console.error('Email error:', err);
+      res.status(500).json({ error: 'Ошибка при отправке почты' });
+    }
+  });
+ 
   // --- Auth Routes ---
   app.post('/api/auth/register', async (req, res) => {
-    const { name, surname, email, password, captchaId, captchaAnswer } = req.body;
+    const { name, surname, email, password, code, captchaId, captchaAnswer } = req.body;
     
+    // Check Captcha
     if (captchas.get(captchaId) !== captchaAnswer) {
       return res.status(400).json({ error: 'Неверная капча' });
     }
     captchas.delete(captchaId);
+
+    // Check Email Code
+    const stored = emailCodes.get(email);
+    if (!stored || stored.code !== code || stored.expires < Date.now()) {
+      return res.status(400).json({ error: 'Неверный или просроченный код из письма' });
+    }
+    emailCodes.delete(email);
 
     const existingUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (existingUser) return res.status(400).json({ error: 'Email уже занят' });
@@ -75,15 +135,20 @@ async function startServer() {
     });
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
-    res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+    res.cookie('token', token, { 
+      httpOnly: true, 
+      secure: true, 
+      sameSite: 'none'
+    });
     res.json({ message: 'Success' });
   });
 
   app.post('/api/auth/login', async (req, res) => {
     const { email, password, captchaId, captchaAnswer } = req.body;
     
+    // Check Captcha
     if (captchaId && captchas.get(captchaId) !== captchaAnswer) {
-        return res.status(400).json({ error: 'Неверная капча' });
+      return res.status(400).json({ error: 'Неверная капча' });
     }
     if (captchaId) captchas.delete(captchaId);
 
@@ -93,7 +158,11 @@ async function startServer() {
     }
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
+    res.cookie('token', token, { 
+      httpOnly: true, 
+      secure: true, 
+      sameSite: 'none'
+    });
     res.json({ message: 'Success' });
   });
 

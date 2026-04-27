@@ -99,11 +99,11 @@ export default function ProfilePage() {
            <div className="flex md:flex-col gap-4">
              <div className="p-6 bg-white/5 border border-white/10 backdrop-blur-sm rounded-[1.5rem] text-center min-w-[120px]">
                 <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">XP</p>
-                <p className="text-2xl font-black tracking-tighter">1,240</p>
+                <p className="text-2xl font-black tracking-tighter">{(stats.completedCourses * 500) + (stats.totalArticles * 50)}</p>
              </div>
              <div className="p-6 bg-white/5 border border-white/10 backdrop-blur-sm rounded-[1.5rem] text-center min-w-[120px]">
                 <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">Ранг</p>
-                <p className="text-2xl font-black tracking-tighter">#42</p>
+                <p className="text-2xl font-black tracking-tighter">#{Math.max(1, 100 - (stats.completedCourses * 5))}</p>
              </div>
            </div>
         </div>

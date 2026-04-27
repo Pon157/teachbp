@@ -44,21 +44,55 @@ export default function AdminPanel() {
   }, []);
 
   const assignRole = async (userId: string, role: string) => {
-    await fetch('/api/admin/assign-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, role })
-    });
-    fetchData();
+    try {
+        const res = await fetch('/api/admin/assign-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, role })
+        });
+        if (res.ok) fetchData();
+    } catch (err) {
+        console.error(err);
+    }
   };
 
   const assignCurator = async (studentId: string, curatorId: string) => {
-    await fetch('/api/admin/assign-curator', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId, curatorId })
-    });
-    fetchData();
+    try {
+        const res = await fetch('/api/admin/assign-curator', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentId, curatorId })
+        });
+        if (res.ok) fetchData();
+    } catch (err) {
+        console.error(err);
+    }
+  };
+
+  const deleteCourse = async (id: string) => {
+    if (!confirm('Вы уверены, что хотите удалить этот курс?')) return;
+    try {
+        const res = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+        if (res.ok) fetchData();
+    } catch (err) {
+        console.error(err);
+    }
+  };
+
+  const publishCourse = async (id: string) => {
+    try {
+        const res = await fetch(`/api/courses/${id}/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) fetchData();
+        else {
+            const err = await res.json();
+            alert(err.error || 'Ошибка при публикации');
+        }
+    } catch (err) {
+        console.error(err);
+    }
   };
 
   const filteredUsers = users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()));
@@ -183,20 +217,24 @@ export default function AdminPanel() {
                   </div>
                   <div className="flex gap-2">
                      <button 
-                        onClick={async () => {
-                            await fetch(`/api/courses/${course.id}/publish`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ title: course.title })
-                            });
-                            fetchData();
-                        }}
+                        onClick={() => publishCourse(course.id)}
                         disabled={course.status === 'published'}
                         className="flex-1 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black rounded-xl font-bold text-sm disabled:opacity-50 transition-all hover:bg-emerald-500 dark:hover:bg-emerald-500 hover:text-white"
                      >
-                        Опубликовать
+                        {course.status === 'published' ? 'Одобрено' : 'Одобрить'}
                      </button>
-                     <button className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-400"><Trash2 size={18}/></button>
+                     <Link 
+                        to={`/editor/${course.id}`}
+                        className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-indigo-500 transition-colors"
+                     >
+                        <BookOpen size={18}/>
+                     </Link>
+                     <button 
+                        onClick={() => deleteCourse(course.id)}
+                        className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-400 hover:text-red-500 transition-colors"
+                     >
+                        <Trash2 size={18}/>
+                     </button>
                   </div>
               </div>
            ))}

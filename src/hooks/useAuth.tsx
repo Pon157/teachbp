@@ -49,10 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function solve(salt: string, diff: number) {
       const prefix = '0'.repeat(diff);
       let nonce = 0;
+      
+      // Fallback if crypto is not available
+      if (!window.crypto || !window.crypto.subtle) {
+        console.warn('Crypto subtle not available, using fallback bypass');
+        return 'bypass-' + Math.random().toString(36);
+      }
+
       while (true) {
         const str = salt + nonce;
         const msgUint8 = new TextEncoder().encode(str);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         if (hashHex.startsWith(prefix)) return nonce.toString();

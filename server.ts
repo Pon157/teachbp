@@ -53,7 +53,7 @@ async function startServer() {
     
     try {
       const mailPromise = transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@botsupport.edu',
+        from: process.env.SMTP_FROM || 'mail@gialogengine.ru',
         to,
         subject,
         html,

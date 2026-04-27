@@ -171,7 +171,7 @@ export default function CourseViewer() {
           {/* Article Content */}
           <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <article 
-              className="prose prose-slate dark:prose-invert max-w-none 
+              className="prose prose-slate dark:prose-invert max-w-none break-words overflow-hidden
                 prose-h2:text-3xl prose-h2:font-black prose-h2:tracking-tight 
                 prose-p:text-xl prose-p:leading-relaxed prose-p:text-slate-900 dark:prose-p:text-slate-200
                 prose-img:rounded-[2.5rem] prose-img:shadow-2xl prose-img:shadow-slate-100

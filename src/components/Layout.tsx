@@ -29,12 +29,17 @@ export default function Layout() {
   const [theme, setTheme] = useState(user?.theme || 'light');
 
   useEffect(() => {
+    if (user?.theme) {
+      setTheme(user.theme);
+    }
+  }, [user?.theme]);
+
+  useEffect(() => {
     if (user) {
         fetch('/api/notifications')
             .then(res => res.json())
             .then(setNotifications);
     }
-    // Update theme logic here
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [user, theme]);
 

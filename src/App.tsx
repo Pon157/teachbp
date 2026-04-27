@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
 import LandingPage from './pages/LandingPage';
-import BotProtectionGate from './components/BotProtectionGate';
 import Dashboard from './pages/Dashboard';
 import ProfilePage from './pages/ProfilePage';
 import CourseViewer from './pages/CourseViewer';
@@ -31,38 +30,36 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode, roles?
 export default function App() {
   return (
     <AuthProvider>
-      <BotProtectionGate>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/verify/:shareId" element={<VerifyCertificate />} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/verify/:shareId" element={<VerifyCertificate />} />
+          
+          <Route element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/courses/:id" element={<CourseViewer />} />
+            <Route path="/messages" element={<MessagesPage />} />
+            <Route path="/messages/:userId" element={<MessagesPage />} />
             
-            <Route element={
-              <ProtectedRoute>
-                <Layout />
+            <Route path="/editor" element={
+              <ProtectedRoute roles={['teacher', 'admin']}>
+                <EditorPage />
               </ProtectedRoute>
-            }>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/courses/:id" element={<CourseViewer />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/messages/:userId" element={<MessagesPage />} />
-              
-              <Route path="/editor" element={
-                <ProtectedRoute roles={['teacher', 'admin']}>
-                  <EditorPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin" element={
-                <ProtectedRoute roles={['admin']}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              } />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </BotProtectionGate>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute roles={['admin']}>
+                <AdminPanel />
+              </ProtectedRoute>
+            } />
+          </Route>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </AuthProvider>
   );
 }

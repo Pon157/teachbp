@@ -29,17 +29,22 @@ export default function ProfilePage() {
     theme: user?.theme || 'light'
   });
   const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
+    setSuccess(false);
     try {
-      await fetch('/api/profile', {
+      const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      await refreshUser();
-      alert('Сохранено!');
+      if (res.ok) {
+        await refreshUser();
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -236,16 +241,16 @@ export default function ProfilePage() {
                                     </div>
                                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Цветовая тема</span>
                                 </div>
-                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                                      <button 
                                         onClick={() => setFormData({...formData, theme: 'light'})}
-                                        className={cn("p-1.5 rounded-xl transition-all", formData.theme === 'light' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                                        className={cn("p-1.5 rounded-xl transition-all", formData.theme === 'light' ? "bg-white text-indigo-600 shadow-md" : "text-slate-400 hover:text-slate-600")}
                                      >
                                         <Sun size={16} />
                                      </button>
                                      <button 
                                         onClick={() => setFormData({...formData, theme: 'dark'})}
-                                        className={cn("p-1.5 rounded-xl transition-all", formData.theme === 'dark' ? "bg-slate-700 text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                                        className={cn("p-1.5 rounded-xl transition-all", formData.theme === 'dark' ? "bg-slate-700 text-indigo-400 shadow-md" : "text-slate-400 hover:text-slate-600")}
                                      >
                                         <Moon size={16} />
                                      </button>
@@ -255,14 +260,18 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-10 border-t border-slate-50 dark:border-slate-800">
+                <div className="flex justify-end pt-10 border-t border-slate-100 dark:border-slate-800">
                     <button 
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 active:scale-[0.98] transition-all flex items-center space-x-3 disabled:opacity-50"
+                        className={cn(
+                            "px-10 py-5 rounded-2xl font-black text-sm transition-all flex items-center space-x-3 disabled:opacity-50",
+                            success ? "bg-emerald-500 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-100 dark:shadow-none"
+                        )}
                     >
-                        {saving ? <RefreshCcw size={18} className="animate-spin" /> : <span>Сохранить всё</span>}
-                        <ChevronRight size={18} />
+                        {saving ? <RefreshCcw size={18} className="animate-spin" /> : success ? <Shield className="animate-pulse" size={18} /> : null}
+                        <span>{success ? 'Успешно сохранено' : 'Сохранить всё'}</span>
+                        {!success && <ChevronRight size={18} />}
                     </button>
                 </div>
             </div>

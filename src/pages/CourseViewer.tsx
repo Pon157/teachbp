@@ -24,22 +24,35 @@ export default function CourseViewer() {
   const [author, setAuthor] = useState<User | null>(null);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [homeworkResponse, setHomeworkResponse] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [completedBlocks, setCompletedBlocks] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchCourse = async () => {
-      const res = await fetch(`/api/courses/${id}`);
-      const data = await res.json();
-      setCourse(data);
-      
-      if (data.authorId) {
-        const authorRes = await fetch(`/api/users/${data.authorId}`);
-        const authorData = await authorRes.json();
-        setAuthor(authorData);
+      try {
+          const res = await fetch(`/api/courses/${id}`);
+          const data = await res.json();
+          
+          if (!res.ok) {
+            setError(data.error || 'Ошибка при загрузке курса');
+            setLoading(false);
+            return;
+          }
+
+          setCourse(data);
+          
+          if (data.authorId) {
+            const authorRes = await fetch(`/api/users/${data.authorId}`);
+            const authorData = await authorRes.json();
+            setAuthor(authorData);
+          }
+      } catch (err) {
+          setError('Сетевая ошибка');
+      } finally {
+          setLoading(false);
       }
-      setLoading(false);
     };
     fetchCourse();
   }, [id]);
@@ -73,7 +86,19 @@ export default function CourseViewer() {
     }
   };
 
-  if (loading) return <div className="h-full flex items-center justify-center font-mono opacity-50">GENERATING CONTENT...</div>;
+  if (loading) return <div className="h-full flex items-center justify-center font-mono opacity-50 uppercase tracking-widest text-[10px]">Decrypting Educational Data...</div>;
+  if (error) return (
+    <div className="h-full flex flex-col items-center justify-center p-10 text-center space-y-6">
+       <div className="w-20 h-20 bg-red-50 dark:bg-red-500/10 rounded-3xl flex items-center justify-center">
+          <GraduationCap size={40} className="text-red-500" />
+       </div>
+       <h1 className="text-2xl font-black text-slate-900 dark:text-white">Доступ ограничен</h1>
+       <p className="text-slate-500 max-w-sm font-medium">{error}</p>
+       <Link to="/dashboard" className="px-8 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black text-sm transition-all hover:-translate-y-1">
+          Вернуться на главную
+       </Link>
+    </div>
+  );
   if (!course) return <div className="h-full flex items-center justify-center text-red-500">Курс не найден</div>;
 
   const currentBlock = course.blocks[currentBlockIndex];

@@ -148,9 +148,9 @@ export default function CourseViewer() {
             <article 
               className="prose prose-slate dark:prose-invert max-w-none 
                 prose-h2:text-3xl prose-h2:font-black prose-h2:tracking-tight 
-                prose-p:text-xl prose-p:leading-relaxed prose-p:text-slate-600 dark:prose-p:text-slate-400
+                prose-p:text-xl prose-p:leading-relaxed prose-p:text-slate-900 dark:prose-p:text-slate-200
                 prose-img:rounded-[2.5rem] prose-img:shadow-2xl prose-img:shadow-slate-100
-                prose-blockquote:border-l-4 prose-blockquote:border-indigo-600 prose-blockquote:bg-slate-50 prose-blockquote:p-8 prose-blockquote:rounded-r-2xl prose-blockquote:italic prose-blockquote:font-medium prose-blockquote:text-slate-800"
+                prose-blockquote:border-l-4 prose-blockquote:border-indigo-600 prose-blockquote:bg-slate-50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:p-8 prose-blockquote:rounded-r-2xl prose-blockquote:italic prose-blockquote:font-medium prose-blockquote:text-slate-800 dark:prose-blockquote:text-slate-200"
               dangerouslySetInnerHTML={{ __html: currentBlock?.content || '' }}
             />
           </div>

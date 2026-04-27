@@ -158,8 +158,16 @@ async function startServer() {
   });
 
   // --- Courses ---
-  app.get('/api/courses', authenticate, async (req, res) => {
-    const allCourses = await db.select().from(courses); 
+  app.get('/api/courses', authenticate, async (req: any, res) => {
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    
+    let allCourses;
+    if (user?.role === 'admin' || user?.role === 'teacher' || user?.role === 'curator') {
+        allCourses = await db.select().from(courses); 
+    } else {
+        // Students only see published courses
+        allCourses = await db.select().from(courses).where(eq(courses.status, 'published'));
+    }
     res.json(allCourses);
   });
 
@@ -179,20 +187,81 @@ async function startServer() {
     res.json({ id });
   });
 
-  app.get('/api/courses/:id', authenticate, async (req, res) => {
+  app.put('/api/courses/:id', authenticate, async (req: any, res) => {
+    const { title, description, estimatedTime, imageUrl } = req.body;
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
+    
+    if (course?.authorId !== req.userId && user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await db.update(courses).set({ 
+        title, 
+        description, 
+        estimatedTime, 
+        imageUrl 
+    }).where(eq(courses.id, req.params.id));
+    
+    res.json({ message: 'Updated' });
+  });
+
+  app.delete('/api/courses/:id', authenticate, async (req: any, res) => {
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
+    
+    if (course?.authorId !== req.userId && user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await db.delete(courseBlocks).where(eq(courseBlocks.courseId, req.params.id));
+    await db.delete(courses).where(eq(courses.id, req.params.id));
+    res.json({ message: 'Deleted' });
+  });
+
+  app.get('/api/courses/:id', authenticate, async (req: any, res) => {
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    
+    // Curator Check for Students
+    if (user?.role === 'student' && !user.curatorId) {
+        return res.status(403).json({ error: 'Вам еще не назначен куратор. Вы не можете проходить обучение до назначения куратора.' });
+    }
+
+    const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
     const blocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.id)).orderBy(asc(courseBlocks.order));
-    res.json({ ...course, blocks });
+    
+    // Fetch homeworks for blocks
+    const blocksWithHomework: any[] = [];
+    for (const block of blocks) {
+        const homework = (await db.select().from(homeworks).where(eq(homeworks.blockId, block.id)).limit(1))[0];
+        blocksWithHomework.push({ ...block, homework });
+    }
+
+    res.json({ ...course, blocks: blocksWithHomework });
   });
 
   app.post('/api/courses/:id/blocks', authenticate, async (req: any, res) => {
-    const { title, content, order } = req.body;
+    const { title, content, order, homeworkDescription } = req.body;
     const id = uuidv4();
     await db.insert(courseBlocks).values({ id, courseId: req.params.id, title, content, order });
+    
+    if (homeworkDescription) {
+        await db.insert(homeworks).values({
+            id: uuidv4(),
+            blockId: id,
+            description: homeworkDescription
+        });
+    }
+
     res.json({ id });
   });
 
   app.post('/api/courses/:id/publish', authenticate, async (req: any, res) => {
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    if (user?.role !== 'admin') return res.status(403).json({ error: 'Only admin can approve courses' });
+    
     await db.update(courses).set({ status: 'published' }).where(eq(courses.id, req.params.id));
     res.json({ message: 'Published' });
   });

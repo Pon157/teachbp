@@ -464,3 +464,32 @@ async function startServer() {
     const certs = await db.select().from(certificates).where(eq(certificates.userId, req.userId));
     res.json(certs);
   });
+
+  app.get('/api/verify-certificate/:shareId', async (req, res) => {
+    const cert = (await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).limit(1))[0];
+    if (!cert) return res.status(404).json({ error: 'Certificate not found' });
+    const user = (await db.select().from(users).where(eq(users.id, cert.userId)).limit(1))[0];
+    res.json({ cert, user: { name: user?.name, surname: user?.surname, avatar: user?.avatar } });
+  });
+
+  // --- Vite setup ---
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

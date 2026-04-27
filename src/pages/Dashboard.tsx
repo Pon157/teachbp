@@ -133,13 +133,23 @@ export default function Dashboard() {
                   <div className="p-8">
                     <h3 className="font-extrabold text-xl mb-3 text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{course.title}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-8 leading-relaxed font-medium">{course.description}</p>
-                    <Link 
-                      to={`/courses/${course.id}`}
-                      className="w-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 py-4 rounded-2xl font-bold text-sm flex items-center justify-center space-x-2 group/btn transition-all hover:bg-indigo-600 dark:hover:bg-indigo-50 hover:text-white dark:hover:text-indigo-600 shadow-lg shadow-slate-200 dark:shadow-none"
-                    >
-                      <span>Начать изучение</span>
-                      <ChevronRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
-                    </Link>
+                    <div className="flex gap-4">
+                      <Link 
+                        to={`/courses/${course.id}`}
+                        className="flex-1 bg-slate-950 dark:bg-white text-white dark:text-slate-950 py-4 rounded-2xl font-bold text-sm flex items-center justify-center space-x-2 group/btn transition-all hover:bg-indigo-600 dark:hover:bg-indigo-50 hover:text-white dark:hover:text-indigo-600 shadow-lg shadow-slate-200 dark:shadow-none"
+                      >
+                        <span>Начать</span>
+                        <ChevronRight size={18} className="group-hover/btn:translate-x-1 transition-transform" />
+                      </Link>
+                      {(user?.role === 'admin' || user?.role === 'teacher') && (
+                        <Link 
+                          to={`/editor/${course.id}`}
+                          className="p-4 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all"
+                        >
+                          <BookOpen size={20} />
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}

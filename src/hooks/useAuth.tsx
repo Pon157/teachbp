@@ -17,7 +17,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setUser(data);
@@ -36,10 +36,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (credentials: any) => {
+    // Solve JS Challenge
+    let challengeData: any = null;
+    try {
+      const cRes = await fetch('/api/auth/challenge');
+      challengeData = await cRes.json();
+    } catch (err) {
+      throw new Error('Security system unreachable');
+    }
+
+    // Worker simulation to find hash
+    async function solve(salt: string, diff: number) {
+      const prefix = '0'.repeat(diff);
+      let nonce = 0;
+      while (true) {
+        const str = salt + nonce;
+        const msgUint8 = new TextEncoder().encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        if (hashHex.startsWith(prefix)) return nonce.toString();
+        nonce++;
+        if (nonce % 1000 === 0) await new Promise(r => setTimeout(r, 0)); // non-blocking
+      }
+    }
+
+    const challengeNonce = await solve(challengeData.salt, challengeData.difficulty);
+
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ 
+        ...credentials, 
+        challengeId: challengeData.id, 
+        challengeNonce 
+      }),
+      credentials: 'include',
     });
     if (!res.ok) {
       const error = await res.json();

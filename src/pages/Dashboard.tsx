@@ -216,7 +216,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800">
-                <p className="text-sm font-bold text-slate-400">Назначение куратора в процессе...</p>
+                <p className="text-sm font-bold text-slate-400">Вам еще не назначен куратор. Обучение будет доступно после назначения.</p>
               </div>
             )}
           </section>
@@ -238,7 +238,9 @@ export default function Dashboard() {
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{item.sub}</p>
                     </div>
                   </div>
-                  <span className="text-2xl font-black text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{item.value}</span>
+                  <span className="text-2xl font-black text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
+                    {i === 2 ? Math.floor((Date.now() - new Date(user?.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24)) : item.value}
+                  </span>
                 </div>
               ))}
             </div>

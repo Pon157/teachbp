@@ -36,6 +36,7 @@ export default function EditorPage() {
     { id: '1', title: 'Введение', content: '', order: 0 }
   ]);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const addBlock = () => {
     const newBlock: EditorBlock = {
@@ -59,6 +60,7 @@ export default function EditorPage() {
   const saveCourse = async () => {
     if (!courseTitle) return alert('Укажите название курса');
     setLoading(true);
+    setSuccess(false);
     try {
       const courseRes = await fetch('/api/courses', {
         method: 'POST',
@@ -70,11 +72,13 @@ export default function EditorPage() {
           imageUrl
         })
       });
+      
+      if (!courseRes.ok) throw new Error('Failed to create course');
       const courseData = await courseRes.json();
 
-      // Save blocks
-      for (const block of blocks) {
-        await fetch(`/api/courses/${courseData.id}/blocks`, {
+      // Save blocks sequentially or in parallel
+      const blockPromises = blocks.map(block => 
+        fetch(`/api/courses/${courseData.id}/blocks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -82,11 +86,13 @@ export default function EditorPage() {
             content: block.content,
             order: block.order
           })
-        });
-      }
+        })
+      );
+      
+      await Promise.all(blockPromises);
 
-      alert('Курс успешно сохранен как черновик!');
-      navigate('/dashboard');
+      setSuccess(true);
+      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err) {
       console.error(err);
       alert('Ошибка при сохранении курса');
@@ -96,7 +102,7 @@ export default function EditorPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-24">
+    <div className="max-w-5xl mx-auto pb-24 text-slate-900 dark:text-slate-100">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
           <h1 className="text-4xl font-black tracking-tight mb-2 text-slate-900 dark:text-slate-100">Конструктор обучения</h1>
@@ -110,10 +116,13 @@ export default function EditorPage() {
           <button 
             onClick={saveCourse}
             disabled={loading || !courseTitle}
-            className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-sm flex items-center space-x-3 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50"
+            className={cn(
+              "px-8 py-4 rounded-2xl font-black text-sm flex items-center space-x-3 transition-all shadow-xl disabled:opacity-50",
+              success ? "bg-emerald-500 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none"
+            )}
           >
-            {loading ? <RefreshCcw size={20} className="animate-spin" /> : <Send size={20} />}
-            <span>Сохранить всё</span>
+            {loading ? <RefreshCcw size={20} className="animate-spin" /> : success ? <Eye size={20} /> : <Send size={20} />}
+            <span>{success ? 'Готово!' : 'Сохранить всё'}</span>
           </button>
         </div>
       </div>
@@ -128,13 +137,13 @@ export default function EditorPage() {
                   <input 
                     type="text" 
                     placeholder="Название курса..."
-                    className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-indigo-500/30 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-slate-100 outline-none transition-all shadow-sm"
                     value={courseTitle}
                     onChange={e => setCourseTitle(e.target.value)}
                   />
                   <textarea 
                     placeholder="Краткое описание для карточки..."
-                    className="w-full h-28 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none shadow-inner"
+                    className="w-full h-28 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-indigo-500/30 rounded-2xl px-5 py-4 text-sm font-medium text-slate-700 dark:text-slate-300 outline-none transition-all resize-none shadow-inner"
                     value={courseDesc}
                     onChange={e => setCourseDesc(e.target.value)}
                   />
@@ -148,7 +157,7 @@ export default function EditorPage() {
                         <input 
                             type="text" 
                             placeholder="30 мин"
-                            className="w-full bg-slate-100 dark:bg-slate-950 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black outline-none"
+                            className="w-full bg-slate-100 dark:bg-slate-950 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-black text-slate-700 dark:text-slate-200 outline-none"
                             value={estimatedTime}
                             onChange={e => setEstimatedTime(e.target.value)}
                         />
@@ -161,7 +170,7 @@ export default function EditorPage() {
                         <input 
                             type="text" 
                             placeholder="https://images..."
-                            className="w-full bg-slate-100 dark:bg-slate-950 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-bold outline-none"
+                            className="w-full bg-slate-100 dark:bg-slate-950 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none"
                             value={imageUrl}
                             onChange={e => setImageUrl(e.target.value)}
                         />
@@ -276,18 +285,22 @@ export default function EditorPage() {
             background: #fdfdfd !important;
         }
         .dark .ql-toolbar.ql-snow {
-             background: #111 !important;
+             background: #0f172a !important;
              border-color: #1e293b !important;
          }
         .ql-container.ql-snow {
             border: none !important;
             font-family: inherit !important;
             font-size: 1.1rem !important;
+            background: transparent !important;
+            color: inherit !important;
         }
-        .ql-editor { padding: 2rem !important; }
-        .dark .ql-snow .ql-stroke { stroke: #64748b !important; }
-        .dark .ql-snow .ql-fill { fill: #64748b !important; }
-        .dark .ql-snow .ql-picker { color: #64748b !important; }
+        .dark .ql-editor { color: #f1f5f9 !important; }
+        .ql-editor { padding: 2rem !important; min-height: 400px; }
+        .dark .ql-snow .ql-stroke { stroke: #94a3b8 !important; }
+        .dark .ql-snow .ql-fill { fill: #94a3b8 !important; }
+        .dark .ql-snow .ql-picker { color: #94a3b8 !important; }
+        .dark .ql-snow .ql-picker-options { background-color: #1e293b !important; color: #f1f5f9 !important; border: none !important; }
       `}</style>
     </div>
   );

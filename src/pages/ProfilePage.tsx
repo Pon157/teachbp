@@ -78,11 +78,20 @@ export default function ProfilePage() {
            </div>
            
            <div className="text-center md:text-left flex-1">
-              <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-                <h1 className="text-4xl font-black tracking-tight">{user?.name} {user?.surname}</h1>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
+                <h1 className="text-4xl font-black tracking-tight text-white">{user?.name} {user?.surname}</h1>
                 <span className="inline-flex px-3 py-1 bg-white/10 backdrop-blur-md text-indigo-300 text-[10px] uppercase font-black tracking-[0.2em] rounded-lg border border-white/10">
                     {user?.role}
                 </span>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.origin + '/profile/' + user?.id);
+                    alert('Ссылка на профиль скопирована!');
+                  }}
+                  className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-[10px] uppercase font-black rounded-lg hover:bg-indigo-500/40 transition-all cursor-pointer border border-indigo-500/30"
+                >
+                  Копировать ссылку
+                </button>
               </div>
               <p className="text-slate-400 text-lg leading-relaxed font-medium max-w-lg">{user?.bio || 'Настройте свой профиль, чтобы кураторы и другие ученики могли узнать больше о вашем опыте и целях.'}</p>
            </div>
@@ -206,29 +215,13 @@ export default function ProfilePage() {
 
                     <div className="space-y-6">
                         <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Система</h4>
-                        <div className="space-y-8">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                      <Globe size={16} className="text-slate-400" />
-                                    </div>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Язык интерфейса</span>
-                                </div>
-                                <select 
-                                    className="bg-slate-100 dark:bg-slate-950 border-none rounded-xl px-4 py-2 text-xs font-bold font-mono outline-none cursor-pointer"
-                                    value={formData.language}
-                                    onChange={e => setFormData({...formData, language: e.target.value})}
-                                >
-                                    <option value="ru">RU</option>
-                                    <option value="en">EN</option>
-                                </select>
-                            </div>
+                        <div className="space-y-8 text-slate-900 dark:text-slate-100">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                       <Bell size={16} className="text-slate-400" />
                                     </div>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Push-уведомления</span>
+                                    <span className="text-sm font-bold">Push-уведомления</span>
                                 </div>
                                 <button className="w-12 h-6 bg-indigo-600 rounded-full relative shadow-inner">
                                     <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full transition-all shadow-md" />
@@ -239,7 +232,7 @@ export default function ProfilePage() {
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                       {formData.theme === 'light' ? <Sun size={16} className="text-slate-400" /> : <Moon size={16} className="text-slate-400" />}
                                     </div>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Цветовая тема</span>
+                                    <span className="text-sm font-bold">Цветовая тема</span>
                                 </div>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                                      <button 

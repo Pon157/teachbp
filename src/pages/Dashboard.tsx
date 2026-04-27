@@ -106,7 +106,11 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {courses.map((course, idx) => (
+              {courses.length === 0 ? (
+                <div className="col-span-full py-20 text-center bg-white dark:bg-slate-900 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-[2rem]">
+                   <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Образовательные треки скоро появятся</p>
+                </div>
+              ) : courses.map((course, idx) => (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

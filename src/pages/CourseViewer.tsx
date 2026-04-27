@@ -25,23 +25,29 @@ export default function CourseViewer() {
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [homeworkResponse, setHomeworkResponse] = useState('');
+  const [homeworkResponses, setHomeworkResponses] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [completedBlocks, setCompletedBlocks] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-          const res = await fetch(`/api/courses/${id}`);
-          const data = await res.json();
+          const [courseRes, progressRes] = await Promise.all([
+            fetch(`/api/courses/${id}`),
+            fetch(`/api/progress/${id}`)
+          ]);
           
-          if (!res.ok) {
+          const data = await courseRes.json();
+          const progressData = await progressRes.json();
+          
+          if (!courseRes.ok) {
             setError(data.error || 'Ошибка при загрузке курса');
             setLoading(false);
             return;
           }
 
           setCourse(data);
+          setCompletedBlocks(progressData.filter((p: any) => p.status === 'completed').map((p: any) => p.blockId));
           
           if (data.authorId) {
             const authorRes = await fetch(`/api/users/${data.authorId}`);
@@ -64,14 +70,14 @@ export default function CourseViewer() {
       await fetch('/api/progress/complete-block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blockId: block.id, homeworkResponse })
+        body: JSON.stringify({ blockId: block.id, homeworkResponse: homeworkResponses })
       });
       
       setCompletedBlocks([...completedBlocks, block.id]);
       
       if (currentBlockIndex < course!.blocks.length - 1) {
         setCurrentBlockIndex(currentBlockIndex + 1);
-        setHomeworkResponse('');
+        setHomeworkResponses({});
       } else {
         confetti({
           particleCount: 150,
@@ -103,6 +109,9 @@ export default function CourseViewer() {
 
   const currentBlock = course.blocks[currentBlockIndex];
   const progress = ((currentBlockIndex + 1) / course.blocks.length) * 100;
+  const isLastBlock = currentBlockIndex === course.blocks.length - 1;
+  const hasTasks = currentBlock.homeworks && currentBlock.homeworks.length > 0;
+  const allTasksAnswered = !hasTasks || currentBlock.homeworks?.every(t => homeworkResponses[t.id]);
 
   return (
     <div className="max-w-4xl mx-auto pb-24">
@@ -186,41 +195,72 @@ export default function CourseViewer() {
                 <GraduationCap className="w-32 h-32" />
             </div>
             
-            <div className="relative z-10">
+            <div className="relative z-10 space-y-12">
               <h2 className="text-3xl font-black mb-8 flex items-center gap-4">
                 <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white">
                   <Send size={20} />
                 </div>
                 <span>Практика</span>
               </h2>
-              
-              <div className="bg-white/5 border border-white/10 backdrop-blur-sm p-8 rounded-[2rem] mb-10 italic text-slate-300 text-lg font-medium leading-relaxed">
-                  "Практика — это единственный способ закрепить знания. Попробуйте применить изученное прямо сейчас."
-                  <div className="mt-4 text-sm font-bold text-indigo-400 uppercase tracking-widest">— Команда проекта</div>
+
+              <div className="space-y-10">
+                {currentBlock.homeworks?.map((task, idx) => (
+                  <div key={task.id} className="space-y-6">
+                    <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">{idx + 1}</div>
+                        <p className="text-xl font-medium text-slate-200">{task.description}</p>
+                    </div>
+
+                    {task.type === 'quiz' ? (
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-12">
+                          {task.options?.map((opt: string) => (
+                             <button 
+                                key={opt}
+                                onClick={() => setHomeworkResponses({ ...homeworkResponses, [task.id]: opt })}
+                                className={cn(
+                                   "p-5 rounded-2xl border text-left font-bold transition-all text-sm",
+                                   homeworkResponses[task.id] === opt 
+                                   ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-900/40" 
+                                   : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                                )}
+                             >
+                                {opt}
+                             </button>
+                          ))}
+                       </div>
+                    ) : (
+                        <textarea 
+                            className="w-full min-h-[150px] bg-slate-800/50 border border-slate-700 rounded-[2rem] p-8 text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-600 ml-12"
+                            placeholder="Опишите свое решение здесь..."
+                            value={homeworkResponses[task.id] || ''}
+                            onChange={e => setHomeworkResponses({ ...homeworkResponses, [task.id]: e.target.value })}
+                        />
+                    )}
+                  </div>
+                ))}
+
+                {!hasTasks && (
+                  <div className="bg-white/5 border border-white/10 backdrop-blur-sm p-8 rounded-[2rem] italic text-slate-300 text-lg font-medium leading-relaxed">
+                      "Для этого урока нет специальных заданий. Просто нажмите кнопку ниже, чтобы зафиксировать прогресс."
+                      <div className="mt-4 text-sm font-bold text-indigo-400 uppercase tracking-widest">— Команда проекта</div>
+                  </div>
+                )}
               </div>
               
-              <div className="space-y-6">
-                <textarea 
-                  className="w-full min-h-[200px] bg-slate-800/50 border border-slate-700 rounded-3xl p-8 text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-600"
-                  placeholder="Опишите свое решение здесь..."
-                  value={homeworkResponse}
-                  onChange={e => setHomeworkResponse(e.target.value)}
-                />
-                <div className="flex flex-col sm:flex-row justify-end gap-4">
-                   <button className="px-8 py-5 rounded-2xl font-extrabold text-sm text-slate-400 hover:text-white transition-colors">Сохранить черновик</button>
-                   <button 
-                    onClick={handleCompleteBlock}
-                    disabled={submitting || !homeworkResponse}
-                    className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-sm flex items-center justify-center space-x-3 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900 active:scale-95 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500 disabled:shadow-none"
-                   >
-                     {submitting ? <RefreshCcw className="animate-spin" /> : (
-                       <>
-                        <span>{currentBlockIndex === course.blocks.length - 1 ? 'Завершить обучение' : 'Перейти далее'}</span>
-                        <ChevronRight size={20} />
-                       </>
-                     )}
-                   </button>
-                </div>
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-10 border-t border-white/10">
+                 <button className="px-8 py-5 rounded-2xl font-extrabold text-sm text-slate-400 hover:text-white transition-colors">Сохранить черновик</button>
+                 <button 
+                  onClick={handleCompleteBlock}
+                  disabled={submitting || !allTasksAnswered}
+                  className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-sm flex items-center justify-center space-x-3 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900 active:scale-95 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500 disabled:shadow-none"
+                 >
+                   {submitting ? <RefreshCcw className="animate-spin" /> : (
+                     <>
+                      <span>{isLastBlock ? 'Завершить обучение' : 'Перейти далее'}</span>
+                      <ChevronRight size={20} />
+                     </>
+                   )}
+                 </button>
               </div>
             </div>
           </div>

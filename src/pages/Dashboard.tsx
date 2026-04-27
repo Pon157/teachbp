@@ -9,7 +9,9 @@ import {
   Trophy,
   Users,
   Star,
-  RefreshCcw
+  RefreshCcw,
+  Layout,
+  LayoutDashboard
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Course, User } from '../types';

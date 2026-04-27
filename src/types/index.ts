@@ -32,6 +32,16 @@ export interface CourseBlock {
   title: string;
   content: string;
   order: number;
+  homeworks?: Homework[];
+}
+
+export interface Homework {
+  id: string;
+  blockId: string;
+  type: 'open' | 'quiz' | 'multiple';
+  description: string;
+  options?: any; // string[]
+  correctAnswer?: string;
 }
 
 export interface Notification {

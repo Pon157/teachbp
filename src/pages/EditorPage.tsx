@@ -9,6 +9,7 @@ import {
   Layout, 
   ChevronDown, 
   ChevronUp,
+  ChevronRight,
   Image as ImageIcon,
   Clock,
   Send,
@@ -132,8 +133,8 @@ export default function EditorPage() {
       // I'll update it to clear blocks first if editing.
       
       if (id) {
-          // If editing, the server should probably have a "sync" endpoint
-          // But I'll just re-push them for now.
+          // Tell server to clear blocks if editing
+          await fetch(`/api/courses/${finalId}/clear-blocks`, { method: 'POST' });
       }
 
       const blockPromises = blocks.map(block => 

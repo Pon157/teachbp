@@ -235,24 +235,29 @@ async function startServer() {
     // Fetch homeworks for blocks
     const blocksWithHomework: any[] = [];
     for (const block of blocks) {
-        const homework = (await db.select().from(homeworks).where(eq(homeworks.blockId, block.id)).limit(1))[0];
-        blocksWithHomework.push({ ...block, homework });
+        const blockHomeworks = await db.select().from(homeworks).where(eq(homeworks.blockId, block.id));
+        blocksWithHomework.push({ ...block, homeworks: blockHomeworks });
     }
 
     res.json({ ...course, blocks: blocksWithHomework });
   });
 
   app.post('/api/courses/:id/blocks', authenticate, async (req: any, res) => {
-    const { title, content, order, homeworkDescription } = req.body;
+    const { title, content, order, tasks } = req.body;
     const id = uuidv4();
     await db.insert(courseBlocks).values({ id, courseId: req.params.id, title, content, order });
     
-    if (homeworkDescription) {
-        await db.insert(homeworks).values({
-            id: uuidv4(),
-            blockId: id,
-            description: homeworkDescription
-        });
+    if (tasks && Array.isArray(tasks)) {
+        for (const task of tasks) {
+            await db.insert(homeworks).values({
+                id: uuidv4(),
+                blockId: id,
+                type: task.type || 'open',
+                description: task.description,
+                options: task.options,
+                correctAnswer: task.correctAnswer
+            });
+        }
     }
 
     res.json({ id });
@@ -330,6 +335,52 @@ async function startServer() {
   app.get('/api/notifications', authenticate, async (req: any, res) => {
     const all = await db.select().from(notifications).where(eq(notifications.userId, req.userId)).orderBy(desc(notifications.createdAt));
     res.json(all);
+  });
+
+  // --- Progress ---
+  app.get('/api/progress/:courseId', authenticate, async (req: any, res) => {
+    const blocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.courseId));
+    const blockIds = blocks.map(b => b.id);
+    if (blockIds.length === 0) return res.json([]);
+    
+    const progress = await db.select().from(userProgress).where(
+        and(eq(userProgress.userId, req.userId), or(...blockIds.map(id => eq(userProgress.blockId, id))))
+    );
+    res.json(progress);
+  });
+
+  app.post('/api/progress/complete-block', authenticate, async (req: any, res) => {
+    const { blockId, homeworkResponse } = req.body;
+    const existing = (await db.select().from(userProgress).where(
+        and(eq(userProgress.userId, req.userId), eq(userProgress.blockId, blockId))
+    ).limit(1))[0];
+
+    if (existing) {
+        await db.update(userProgress).set({
+            homeworkResponse,
+            status: 'completed',
+            updatedAt: new Date()
+        }).where(eq(userProgress.id, existing.id));
+    } else {
+        await db.insert(userProgress).values({
+            id: uuidv4(),
+            userId: req.userId,
+            blockId,
+            homeworkResponse,
+            status: 'completed',
+            updatedAt: new Date()
+        });
+    }
+    res.json({ message: 'Success' });
+  });
+
+  // --- Certificates ---
+  app.get('/api/verify-certificate/:shareId', async (req, res) => {
+    const cert = (await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).limit(1))[0];
+    if (!cert) return res.status(404).json({ error: 'Not found' });
+
+    const user = (await db.select().from(users).where(eq(users.id, cert.userId)).limit(1))[0];
+    res.json({ cert, user: user ? { name: user.name, surname: user.surname } : null });
   });
 
   // --- Vite ---

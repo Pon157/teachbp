@@ -72,7 +72,13 @@ export default function ProfilePage() {
               <div className="w-40 h-40 rounded-[2.5rem] bg-slate-800 overflow-hidden border-4 border-slate-800 shadow-xl transition-all group-hover:border-indigo-500">
                 {formData.avatar ? <img src={formData.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-5xl bg-indigo-600 shadow-inner">{user?.name[0]}</div>}
               </div>
-              <button className="absolute -bottom-2 -right-2 p-3 bg-indigo-600 text-white rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95">
+              <button 
+                onClick={() => {
+                   const url = prompt('Введите URL изображения:', formData.avatar);
+                   if (url !== null) setFormData({...formData, avatar: url});
+                }}
+                className="absolute -bottom-2 -right-2 p-3 bg-indigo-600 text-white rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95"
+              >
                 <Camera size={20} />
               </button>
            </div>

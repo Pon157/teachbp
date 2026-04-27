@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
 import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks } from './src/lib/schema.ts';
@@ -27,17 +28,35 @@ async function startServer() {
   // --- Email Transporter ---
   let transporter: nodemailer.Transporter | null = null;
   
-  if (process.env.SMTP_USER) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+  // Storage for JS Proof-of-Work Challenges
+  const pendingJsChallenges = new Map<string, { salt: string; difficulty: number; expires: number }>();
+
+  app.get('/api/auth/challenge', (req, res) => {
+    const id = uuidv4();
+    const salt = Math.random().toString(36).substring(2);
+    const difficulty = 4; // Number of leading zeros in hex hash (e.g. 4 zeros = approx 65k attempts)
+    pendingJsChallenges.set(id, { 
+      salt, 
+      difficulty, 
+      expires: Date.now() + 5 * 60 * 1000 
     });
-  }
+    res.json({ id, salt, difficulty });
+  });
+
+  const verifyChallenge = (id: string, nonce: string) => {
+    const challenge = pendingJsChallenges.get(id);
+    if (!challenge || challenge.expires < Date.now()) return false;
+    
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(challenge.salt + nonce).digest('hex');
+    const prefix = '0'.repeat(challenge.difficulty);
+    
+    if (hash.startsWith(prefix)) {
+      pendingJsChallenges.delete(id);
+      return true;
+    }
+    return false;
+  };
 
   const sendEmail = async (to: string, subject: string, html: string) => {
     if (!transporter) {
@@ -53,7 +72,7 @@ async function startServer() {
     
     try {
       const mailPromise = transporter.sendMail({
-        from: process.env.SMTP_FROM || 'mail@gialogengine.ru',
+        from: process.env.SMTP_FROM || 'noreply@botsupport.edu',
         to,
         subject,
         html,
@@ -97,8 +116,33 @@ async function startServer() {
   });
 
   app.post('/api/auth/send-code', async (req, res) => {
-    const { email } = req.body;
+    let { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
+    email = email.toLowerCase().trim();
+
+    // Basic regex check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Некорректный формат email' });
+    }
+
+    // Verify domain exists (simple check)
+    const domain = email.split('@')[1];
+    try {
+      await new Promise((resolve, reject) => {
+        dns.resolveMx(domain, (err, addresses) => {
+          if (err || !addresses || addresses.length === 0) {
+            // Try A record if MX fails
+            dns.resolve(domain, (err2) => {
+              if (err2) reject(new Error('Domain invalid'));
+              else resolve(true);
+            });
+          } else resolve(true);
+        });
+      });
+    } catch (err) {
+      return res.status(400).json({ error: 'Почтовый домен не существует' });
+    }
  
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
@@ -118,8 +162,14 @@ async function startServer() {
  
   // --- Auth Routes ---
   app.post('/api/auth/register', async (req, res) => {
-    const { name, surname, email, password, code, captchaId, captchaAnswer } = req.body;
+    let { name, surname, email, password, code, captchaId, captchaAnswer, challengeId, challengeNonce } = req.body;
+    email = email.toLowerCase().trim();
     
+    // JS Challenge Verify
+    if (!verifyChallenge(challengeId, challengeNonce)) {
+      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
+    }
+
     // Check Captcha
     if (captchas.get(captchaId) !== captchaAnswer) {
       return res.status(400).json({ error: 'Неверная капча' });
@@ -155,10 +205,11 @@ async function startServer() {
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
     
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.hostname.includes('run.app');
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: true, 
-      sameSite: 'none',
+      secure: isHttps, 
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
@@ -166,8 +217,14 @@ async function startServer() {
   });
 
   app.post('/api/auth/login', async (req, res) => {
-    const { email, password, captchaId, captchaAnswer } = req.body;
+    let { email, password, captchaId, captchaAnswer, challengeId, challengeNonce } = req.body;
+    email = email.toLowerCase().trim();
     
+    // JS Challenge Verify
+    if (!verifyChallenge(challengeId, challengeNonce)) {
+      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
+    }
+
     // Check Captcha
     if (captchaId && captchas.get(captchaId) !== captchaAnswer) {
       return res.status(400).json({ error: 'Неверная капча' });
@@ -181,10 +238,11 @@ async function startServer() {
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
     
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.hostname.includes('run.app');
     res.cookie('token', token, { 
       httpOnly: true, 
-      secure: true, 
-      sameSite: 'none',
+      secure: isHttps, 
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/'
     });
@@ -192,8 +250,14 @@ async function startServer() {
   });
 
   app.post('/api/auth/forgot-password', async (req, res) => {
-    const { email } = req.body;
+    let { email, challengeId, challengeNonce } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
+    email = email.toLowerCase().trim();
+
+    // JS Challenge Verify
+    if (!verifyChallenge(challengeId, challengeNonce)) {
+      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
+    }
 
     const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -214,7 +278,8 @@ async function startServer() {
   });
 
   app.post('/api/auth/reset-password', async (req, res) => {
-    const { email, code, newPassword } = req.body;
+    let { email, code, newPassword } = req.body;
+    email = email.toLowerCase().trim();
     
     const stored = emailCodes.get(`reset:${email}`);
     if (!stored || stored.code !== code || stored.expires < Date.now()) {
@@ -229,7 +294,13 @@ async function startServer() {
   });
 
   app.post('/api/auth/logout', (req, res) => {
-    res.clearCookie('token');
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || req.hostname.includes('run.app');
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/'
+    });
     res.json({ message: 'Logged out' });
   });
 

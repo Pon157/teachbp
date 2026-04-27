@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { User, Course } from '../types';
 import { cn } from '../lib/utils';
 

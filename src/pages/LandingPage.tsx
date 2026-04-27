@@ -45,37 +45,12 @@ export default function LandingPage() {
     setLoading(true);
     setSuccess('');
     try {
-      const cRes = await fetch('/api/auth/challenge');
-      const cData = await cRes.json();
-      
-      async function solvePoW(salt: string, diff: number) {
-        const prefix = '0'.repeat(diff);
-        let nonce = 0;
-
-        if (!window.crypto || !window.crypto.subtle) {
-          return 'bypass-' + Math.random().toString(36);
-        }
-
-        while (true) {
-          const str = salt + nonce;
-          const msgUint8 = new TextEncoder().encode(str);
-          const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
-          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          if (hashHex.startsWith(prefix)) return nonce.toString();
-          nonce++;
-          if (nonce % 2000 === 0) await new Promise(r => setTimeout(r, 0));
-        }
-      }
-      const challengeNonce = await solvePoW(cData.salt, cData.difficulty);
-
       const endpoint = isForgotPassword ? '/api/auth/forgot-password' : '/api/auth/send-code';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: formData.email,
-          challengeId: cData.id,
-          challengeNonce
+          email: formData.email
         })
       });
       const data = await res.json();
@@ -139,40 +114,13 @@ export default function LandingPage() {
           return;
         }
         console.log('Attempting registration for:', formData.email);
-        // JS Challenge for Register
-        const cRes = await fetch('/api/auth/challenge');
-        const cData = await cRes.json();
-        
-        async function solvePoW(salt: string, diff: number) {
-          const prefix = '0'.repeat(diff);
-          let nonce = 0;
-
-          if (!window.crypto || !window.crypto.subtle) {
-            return 'bypass-' + Math.random().toString(36);
-          }
-
-          while (true) {
-            const str = salt + nonce;
-            const msgUint8 = new TextEncoder().encode(str);
-            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            if (hashHex.startsWith(prefix)) return nonce.toString();
-            nonce++;
-            if (nonce % 2000 === 0) await new Promise(r => setTimeout(r, 0));
-          }
-        }
-        
-        const challengeNonce = await solvePoW(cData.salt, cData.difficulty);
 
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
-            captchaId: captcha?.id,
-            challengeId: cData.id,
-            challengeNonce
+            captchaId: captcha?.id
           })
         });
         const data = await res.json();

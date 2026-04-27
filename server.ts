@@ -28,42 +28,6 @@ async function startServer() {
   // --- Email Transporter ---
   let transporter: nodemailer.Transporter | null = null;
   
-  // Storage for JS Proof-of-Work Challenges
-  const pendingJsChallenges = new Map<string, { salt: string; difficulty: number; expires: number }>();
-
-  app.get('/api/auth/challenge', (req, res) => {
-    const id = uuidv4();
-    const salt = Math.random().toString(36).substring(2);
-    const difficulty = 4; // Number of leading zeros in hex hash (e.g. 4 zeros = approx 65k attempts)
-    pendingJsChallenges.set(id, { 
-      salt, 
-      difficulty, 
-      expires: Date.now() + 5 * 60 * 1000 
-    });
-    res.json({ id, salt, difficulty });
-  });
-
-  const verifyChallenge = (id: string, nonce: string) => {
-    const challenge = pendingJsChallenges.get(id);
-    if (!challenge || challenge.expires < Date.now()) return false;
-    
-    // Allow bypass for browsers that have issues with SubtleCrypto in sandbox
-    if (nonce.startsWith('bypass-')) {
-      pendingJsChallenges.delete(id);
-      return true;
-    }
-
-    const crypto = require('crypto');
-    const hash = crypto.createHash('sha256').update(challenge.salt + nonce).digest('hex');
-    const prefix = '0'.repeat(challenge.difficulty);
-    
-    if (hash.startsWith(prefix)) {
-      pendingJsChallenges.delete(id);
-      return true;
-    }
-    return false;
-  };
-
   const sendEmail = async (to: string, subject: string, html: string) => {
     if (!transporter) {
       console.log('------------------------------------------');
@@ -168,14 +132,9 @@ async function startServer() {
  
   // --- Auth Routes ---
   app.post('/api/auth/register', async (req, res) => {
-    let { name, surname, email, password, code, captchaId, captchaAnswer, challengeId, challengeNonce } = req.body;
+    let { name, surname, email, password, code, captchaId, captchaAnswer } = req.body;
     email = email.toLowerCase().trim();
     
-    // JS Challenge Verify
-    if (!verifyChallenge(challengeId, challengeNonce)) {
-      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
-    }
-
     // Check Captcha
     if (captchas.get(captchaId) !== captchaAnswer) {
       return res.status(400).json({ error: 'Неверная капча' });
@@ -223,14 +182,9 @@ async function startServer() {
   });
 
   app.post('/api/auth/login', async (req, res) => {
-    let { email, password, captchaId, captchaAnswer, challengeId, challengeNonce } = req.body;
+    let { email, password, captchaId, captchaAnswer } = req.body;
     email = email.toLowerCase().trim();
     
-    // JS Challenge Verify
-    if (!verifyChallenge(challengeId, challengeNonce)) {
-      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
-    }
-
     // Check Captcha
     if (captchaId && captchas.get(captchaId) !== captchaAnswer) {
       return res.status(400).json({ error: 'Неверная капча' });
@@ -256,14 +210,9 @@ async function startServer() {
   });
 
   app.post('/api/auth/forgot-password', async (req, res) => {
-    let { email, challengeId, challengeNonce } = req.body;
+    let { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
     email = email.toLowerCase().trim();
-
-    // JS Challenge Verify
-    if (!verifyChallenge(challengeId, challengeNonce)) {
-      return res.status(400).json({ error: 'Security challenge failed (bot protection)' });
-    }
 
     const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -466,81 +415,3 @@ async function startServer() {
     const userNotifications = await db.select().from(notifications).where(eq(notifications.userId, req.userId)).orderBy(desc(notifications.createdAt));
     res.json(userNotifications);
   });
-
-  app.post('/api/notifications/:id/read', authenticate, async (req: any, res) => {
-    await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, req.params.id), eq(notifications.userId, req.userId)));
-    res.json({ message: 'Read' });
-  });
-
-  // --- Progress & Certificates ---
-  app.post('/api/progress/complete-block', authenticate, async (req: any, res) => {
-    const { blockId, homeworkResponse } = req.body;
-    const progressId = uuidv4();
-    await db.insert(userProgress).values({
-        id: progressId,
-        userId: req.userId,
-        blockId,
-        status: 'completed',
-        homeworkResponse,
-        updatedAt: new Date()
-    });
-    
-    // Notify creator/curator maybe? user wants bell notification
-    await db.insert(notifications).values({
-        id: uuidv4(),
-        userId: req.userId,
-        message: 'Вы успешно прошли учебный блок!',
-        type: 'course_pass',
-        createdAt: new Date()
-    });
-
-    res.json({ message: 'Completed' });
-  });
-
-  app.post('/api/certificates', authenticate, async (req: any, res) => {
-    const { courseIds } = req.body; // array of names
-    const certId = uuidv4();
-    const shareId = Math.random().toString(36).substring(2, 10).toUpperCase();
-    await db.insert(certificates).values({
-        id: certId,
-        userId: req.userId,
-        courseIds: JSON.stringify(courseIds),
-        shareId,
-        createdAt: new Date()
-    });
-    res.json({ id: certId, shareId });
-  });
-
-  app.get('/api/certificates', authenticate, async (req: any, res) => {
-    const certs = await db.select().from(certificates).where(eq(certificates.userId, req.userId));
-    res.json(certs);
-  });
-
-  app.get('/api/verify-certificate/:shareId', async (req, res) => {
-    const cert = (await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).limit(1))[0];
-    if (!cert) return res.status(404).json({ error: 'Certificate not found' });
-    const user = (await db.select().from(users).where(eq(users.id, cert.userId)).limit(1))[0];
-    res.json({ cert, user: { name: user?.name, surname: user?.surname, avatar: user?.avatar } });
-  });
-
-  // --- Vite setup ---
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
-
-startServer();

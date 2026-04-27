@@ -51,9 +51,16 @@ export default function AdminPanel() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, role })
         });
-        if (res.ok) fetchData();
+        if (res.ok) {
+            await fetchData();
+            alert('Роль успешно обновлена');
+        } else {
+            const err = await res.json();
+            alert(err.error || 'Ошибка доступа');
+        }
     } catch (err) {
         console.error(err);
+        alert('Сетевая ошибка');
     }
   };
 
@@ -64,9 +71,16 @@ export default function AdminPanel() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ studentId, curatorId })
         });
-        if (res.ok) fetchData();
+        if (res.ok) {
+            await fetchData();
+            alert('Куратор успешно назначен');
+        } else {
+            const err = await res.json();
+            alert(err.error || 'Ошибка назначения');
+        }
     } catch (err) {
         console.error(err);
+        alert('Сетевая ошибка');
     }
   };
 

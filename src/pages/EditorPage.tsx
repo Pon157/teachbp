@@ -23,12 +23,20 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 
+interface Task {
+  id: string;
+  type: 'open' | 'quiz' | 'multiple';
+  description: string;
+  options: string[];
+  correctAnswer: string;
+}
+
 interface EditorBlock {
   id: string;
   title: string;
   content: string;
   order: number;
-  homework?: string;
+  tasks: Task[];
 }
 
 export default function EditorPage() {
@@ -41,7 +49,7 @@ export default function EditorPage() {
   const [estimatedTime, setEstimatedTime] = useState('30 мин');
   const [imageUrl, setImageUrl] = useState('');
   const [blocks, setBlocks] = useState<EditorBlock[]>([
-    { id: '1', title: 'Введение', content: '', order: 0 }
+    { id: '1', title: 'Введение', content: '', order: 0, tasks: [] }
   ]);
   
   const [loading, setLoading] = useState(false);
@@ -66,7 +74,13 @@ export default function EditorPage() {
                     title: b.title,
                     content: b.content,
                     order: b.order,
-                    homework: b.homework?.description
+                    tasks: b.homeworks?.map((h: any) => ({
+                        id: h.id,
+                        type: h.type,
+                        description: h.description,
+                        options: h.options || [],
+                        correctAnswer: h.correctAnswer || ''
+                    })) || []
                 })));
                 setActiveBlockId(data.blocks[0].id);
             }
@@ -81,10 +95,44 @@ export default function EditorPage() {
       id: newId,
       title: 'Новый блок',
       content: '',
-      order: blocks.length
+      order: blocks.length,
+      tasks: []
     };
     setBlocks([...blocks, newBlock]);
     setActiveBlockId(newId);
+  };
+
+  const addTask = (blockId: string) => {
+    setBlocks(blocks.map(b => {
+        if (b.id !== blockId) return b;
+        return {
+            ...b,
+            tasks: [...b.tasks, {
+                id: Math.random().toString(36).substr(2, 9),
+                type: 'open',
+                description: '',
+                options: [],
+                correctAnswer: ''
+            }]
+        };
+    }));
+  };
+
+  const removeTask = (blockId: string, taskId: string) => {
+    setBlocks(blocks.map(b => {
+        if (b.id !== blockId) return b;
+        return { ...b, tasks: b.tasks.filter(t => t.id !== taskId) };
+    }));
+  };
+
+  const updateTask = (blockId: string, taskId: string, updates: Partial<Task>) => {
+    setBlocks(blocks.map(b => {
+        if (b.id !== blockId) return b;
+        return {
+            ...b,
+            tasks: b.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
+        };
+    }));
   };
 
   const removeBlock = (blockId: string) => {
@@ -145,7 +193,7 @@ export default function EditorPage() {
             title: block.title,
             content: block.content,
             order: block.order,
-            homeworkDescription: block.homework
+            tasks: block.tasks
           })
         })
       );
@@ -284,22 +332,112 @@ export default function EditorPage() {
                     </div>
 
                     {/* Task Section */}
-                    <div className="space-y-6 bg-indigo-50 dark:bg-indigo-500/5 p-10 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-500/20">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center">
-                                <FileText size={20} />
+                    <div className="space-y-8 bg-indigo-50 dark:bg-indigo-500/5 p-10 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-500/20">
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center">
+                                    <FileText size={20} />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white">Практические задания</h4>
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest italic">Студент должен выполнить их для прохождения</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 className="text-sm font-black text-slate-900 dark:text-white">Домашнее задание</h4>
-                                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest italic">Будет отображаться в конце урока</p>
-                            </div>
+                            <button 
+                                onClick={() => addTask(activeBlockId)}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-[10px] uppercase font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                            >
+                                <Plus size={14} />
+                                Добавить задание
+                            </button>
                          </div>
-                         <textarea 
-                            value={activeBlock?.homework || ''}
-                            onChange={(e) => updateBlock(activeBlockId, { homework: e.target.value })}
-                            placeholder="Опишите, что студент должен выполнить после изучения этого материала..."
-                            className="w-full bg-white dark:bg-slate-950 border-none rounded-2xl px-6 py-5 text-sm font-medium text-slate-700 dark:text-slate-300 outline-none min-h-[120px] resize-none shadow-inner"
-                         />
+
+                         <div className="space-y-6">
+                            {activeBlock?.tasks.map((task, tIdx) => (
+                                <div key={task.id} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-indigo-100 dark:border-indigo-800 shadow-sm space-y-4">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs font-black text-indigo-500">#{tIdx + 1}</span>
+                                            <select 
+                                                value={task.type}
+                                                onChange={e => updateTask(activeBlockId, task.id, { type: e.target.value as any })}
+                                                className="bg-slate-50 dark:bg-slate-800 text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg outline-none"
+                                            >
+                                                <option value="open">Текст (Куратор)</option>
+                                                <option value="quiz">Квиз (Авто)</option>
+                                            </select>
+                                        </div>
+                                        <button 
+                                            onClick={() => removeTask(activeBlockId, task.id)}
+                                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+
+                                    <textarea 
+                                        value={task.description}
+                                        onChange={(e) => updateTask(activeBlockId, task.id, { description: e.target.value })}
+                                        placeholder="Описание задания..."
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-sm font-medium outline-none h-20 resize-none shadow-inner"
+                                    />
+
+                                    {task.type === 'quiz' && (
+                                        <div className="space-y-4 pt-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] font-black uppercase text-slate-400">Варианты ответов</label>
+                                                <button 
+                                                    onClick={() => updateTask(activeBlockId, task.id, { options: [...task.options, ''] })}
+                                                    className="text-[10px] font-black text-indigo-500"
+                                                >
+                                                    + Добавить
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {task.options.map((opt, oIdx) => (
+                                                    <div key={oIdx} className="flex items-center gap-2">
+                                                        <input 
+                                                            type="radio" 
+                                                            name={`correct-${task.id}`}
+                                                            checked={task.correctAnswer === opt && opt !== ''}
+                                                            onChange={() => updateTask(activeBlockId, task.id, { correctAnswer: opt })}
+                                                            className="text-indigo-600"
+                                                        />
+                                                        <input 
+                                                            className="flex-1 bg-slate-50 dark:bg-slate-950 border-none rounded-lg px-3 py-2 text-xs font-medium outline-none"
+                                                            value={opt}
+                                                            onChange={e => {
+                                                                const newOpts = [...task.options];
+                                                                newOpts[oIdx] = e.target.value;
+                                                                updateTask(activeBlockId, task.id, { options: newOpts });
+                                                            }}
+                                                            placeholder={`Вариант ${oIdx + 1}`}
+                                                        />
+                                                        <button 
+                                                            onClick={() => {
+                                                                const newOpts = task.options.filter((_, idx) => idx !== oIdx);
+                                                                updateTask(activeBlockId, task.id, { options: newOpts });
+                                                            }}
+                                                            className="text-slate-300 hover:text-red-500"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {task.options.length > 0 && (
+                                                <p className="text-[9px] text-slate-400 italic">Выберите правильный вариант, отметив кружок слева</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {activeBlock?.tasks.length === 0 && (
+                                <div className="text-center py-10 opacity-30 border-2 border-dashed border-indigo-200 dark:border-indigo-900 rounded-3xl">
+                                    <p className="text-xs font-bold">Нет заданий. Студент сможет просто нажать "Прочел"</p>
+                                </div>
+                            )}
+                         </div>
                     </div>
                 </motion.div>
             </AnimatePresence>

@@ -51,6 +51,11 @@ export default function App() {
                 <EditorPage />
               </ProtectedRoute>
             } />
+            <Route path="/editor/:id" element={
+              <ProtectedRoute roles={['teacher', 'admin']}>
+                <EditorPage />
+              </ProtectedRoute>
+            } />
             <Route path="/admin" element={
               <ProtectedRoute roles={['admin']}>
                 <AdminPanel />

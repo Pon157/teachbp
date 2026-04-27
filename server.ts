@@ -415,3 +415,52 @@ async function startServer() {
     const userNotifications = await db.select().from(notifications).where(eq(notifications.userId, req.userId)).orderBy(desc(notifications.createdAt));
     res.json(userNotifications);
   });
+
+  app.post('/api/notifications/:id/read', authenticate, async (req: any, res) => {
+    await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, req.params.id), eq(notifications.userId, req.userId)));
+    res.json({ message: 'Read' });
+  });
+
+  // --- Progress & Certificates ---
+  app.post('/api/progress/complete-block', authenticate, async (req: any, res) => {
+    const { blockId, homeworkResponse } = req.body;
+    const progressId = uuidv4();
+    await db.insert(userProgress).values({
+        id: progressId,
+        userId: req.userId,
+        blockId,
+        status: 'completed',
+        homeworkResponse,
+        updatedAt: new Date()
+    });
+    
+    // Notify creator/curator maybe? user wants bell notification
+    await db.insert(notifications).values({
+        id: uuidv4(),
+        userId: req.userId,
+        message: 'Вы успешно прошли учебный блок!',
+        type: 'course_pass',
+        createdAt: new Date()
+    });
+
+    res.json({ message: 'Completed' });
+  });
+
+  app.post('/api/certificates', authenticate, async (req: any, res) => {
+    const { courseIds } = req.body; // array of names
+    const certId = uuidv4();
+    const shareId = Math.random().toString(36).substring(2, 10).toUpperCase();
+    await db.insert(certificates).values({
+        id: certId,
+        userId: req.userId,
+        courseIds: JSON.stringify(courseIds),
+        shareId,
+        createdAt: new Date()
+    });
+    res.json({ id: certId, shareId });
+  });
+
+  app.get('/api/certificates', authenticate, async (req: any, res) => {
+    const certs = await db.select().from(certificates).where(eq(certificates.userId, req.userId));
+    res.json(certs);
+  });

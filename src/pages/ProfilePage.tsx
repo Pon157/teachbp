@@ -85,8 +85,26 @@ export default function ProfilePage() {
                 </span>
                 <button 
                   onClick={() => {
-                    navigator.clipboard.writeText(window.location.origin + '/profile/' + user?.id);
-                    alert('Ссылка на профиль скопирована!');
+                    const link = `${window.location.origin}/profile/${user?.id}`;
+                    // Fallback for copy in iframe
+                    const textArea = document.createElement("textarea");
+                    textArea.value = link;
+                    textArea.style.position = "fixed";
+                    textArea.style.opacity = "0";
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        alert('Ссылка на профиль скопирована!');
+                    } catch (err) {
+                        try {
+                            navigator.clipboard.writeText(link);
+                            alert('Ссылка на профиль скопирована!');
+                        } catch (e) {
+                            prompt('Скопируйте ссылку вручную:', link);
+                        }
+                    }
+                    document.body.removeChild(textArea);
                   }}
                   className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-[10px] uppercase font-black rounded-lg hover:bg-indigo-500/40 transition-all cursor-pointer border border-indigo-500/30"
                 >
@@ -200,6 +218,15 @@ export default function ProfilePage() {
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 transition-all border-none"
                                     value={formData.surname}
                                     onChange={e => setFormData({...formData, surname: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 ml-1">URL Аватара</label>
+                                <input 
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 transition-all border-none"
+                                    value={formData.avatar}
+                                    onChange={e => setFormData({...formData, avatar: e.target.value})}
+                                    placeholder="https://images.com/my-photo.jpg"
                                 />
                             </div>
                             <div className="space-y-2">

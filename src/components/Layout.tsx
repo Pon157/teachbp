@@ -12,7 +12,8 @@ import {
   Search,
   ChevronDown,
   Moon,
-  Sun
+  Sun,
+  Code2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';

@@ -32,17 +32,20 @@ export default function BotProtectionGate({ children }: { children: React.ReactN
       setTimeout(async () => {
         setStatus('Выполнение проверочного вычисления...');
         
-        // Proof of Work simulation (find a hash with leading zeros)
+        // Proof of Work simulation
         const salt = Math.random().toString(36);
         let nonce = 0;
         const start = Date.now();
         
-        // We run it for at least a bit to ensure activity
         while (Date.now() - start < 1500 || nonce < 5000) {
           const str = salt + nonce;
-          // Simple compute task
-          const buffer = new TextEncoder().encode(str);
-          await crypto.subtle.digest('SHA-256', buffer);
+          if (window.crypto && window.crypto.subtle) {
+            const buffer = new TextEncoder().encode(str);
+            await window.crypto.subtle.digest('SHA-256', buffer);
+          } else {
+            // Fallback for browsers without subtle crypto (simulated delay)
+            await new Promise(r => setTimeout(r, 1));
+          }
           nonce++;
           if (nonce % 1000 === 0) await new Promise(r => setTimeout(r, 0));
         }

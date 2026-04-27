@@ -29,7 +29,7 @@ export const courses = pgTable('courses', {
 
 export const courseBlocks = pgTable('course_blocks', {
   id: text('id').primaryKey(),
-  courseId: text('course_id').notNull().references(() => courses.id),
+  courseId: text('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   content: text('content').notNull(), // HTML string
   order: integer('order').notNull(),
@@ -37,16 +37,19 @@ export const courseBlocks = pgTable('course_blocks', {
 
 export const homeworks = pgTable('homeworks', {
   id: text('id').primaryKey(),
-  blockId: text('block_id').notNull().references(() => courseBlocks.id),
+  blockId: text('block_id').notNull().references(() => courseBlocks.id, { onDelete: 'cascade' }),
+  type: text('type').$type<'open' | 'quiz' | 'multiple'>().default('open'),
   description: text('description').notNull(),
+  options: jsonb('options'), // For quiz: string[]
+  correctAnswer: text('correct_answer'), // For auto-check
 });
 
 export const userProgress = pgTable('user_progress', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id),
-  blockId: text('block_id').notNull().references(() => courseBlocks.id),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  blockId: text('block_id').notNull().references(() => courseBlocks.id, { onDelete: 'cascade' }),
   status: text('status').$type<'unlocked' | 'completed'>().default('unlocked'),
-  homeworkResponse: text('homework_response'),
+  homeworkResponse: jsonb('homework_response'), // Record<taskId, value>
   grade: text('grade'), // 'accepted', 'rejected', null
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

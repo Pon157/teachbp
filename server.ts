@@ -9,7 +9,7 @@ import nodemailer from 'nodemailer';
 import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
-import { users, courses, courseBlocks, notifications, messages, certificates, userProgress } from './src/lib/schema.ts';
+import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks } from './src/lib/schema.ts';
 import { eq, and, or, desc, asc } from 'drizzle-orm';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
@@ -266,6 +266,22 @@ async function startServer() {
     res.json({ message: 'Published' });
   });
 
+  app.post('/api/courses/:id/clear-blocks', authenticate, async (req: any, res) => {
+    const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
+    
+    if (course?.authorId !== req.userId && user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const oldBlocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.id));
+    for (const b of oldBlocks) {
+        await db.delete(homeworks).where(eq(homeworks.blockId, b.id));
+    }
+    await db.delete(courseBlocks).where(eq(courseBlocks.courseId, req.params.id));
+    res.json({ message: 'Cleared' });
+  });
+
   // --- Admin ---
   app.get('/api/admin/users', authenticate, async (req: any, res) => {
     const admin = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
@@ -275,12 +291,18 @@ async function startServer() {
   });
 
   app.post('/api/admin/assign-role', authenticate, async (req: any, res) => {
+    const requester = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    if (requester?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
     const { userId, role } = req.body;
     await db.update(users).set({ role }).where(eq(users.id, userId));
     res.json({ message: 'Ok' });
   });
 
   app.post('/api/admin/assign-curator', authenticate, async (req: any, res) => {
+    const requester = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    if (requester?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
     const { studentId, curatorId } = req.body;
     await db.update(users).set({ curatorId }).where(eq(users.id, studentId));
     res.json({ message: 'Ok' });

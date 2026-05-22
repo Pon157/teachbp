@@ -313,6 +313,29 @@ async function startServer() {
     res.json({ message: 'Ok' });
   });
 
+  app.delete('/api/admin/users/:id', authenticate, async (req: any, res) => {
+    const requester = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+    if (requester?.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+
+    if (req.params.id === req.userId) {
+      return res.status(400).json({ error: 'Вы не можете удалить свою собственную учётную запись' });
+    }
+
+    try {
+      // Delete any dependent records
+      await db.delete(userProgress).where(eq(userProgress.userId, req.params.id));
+      await db.delete(certificates).where(eq(certificates.userId, req.params.id));
+      await db.delete(messages).where(or(eq(messages.senderId, req.params.id), eq(messages.receiverId, req.params.id)));
+      await db.delete(notifications).where(eq(notifications.userId, req.params.id));
+      
+      await db.delete(users).where(eq(users.id, req.params.id));
+      res.json({ message: 'User deleted successfully' });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: 'Ошибка сервера при удалении пользователя' });
+    }
+  });
+
   // --- Messaging ---
   app.get('/api/messages/:otherId', authenticate, async (req: any, res) => {
     const chat = await db.select().from(messages).where(

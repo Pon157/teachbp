@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { 
   User, 
@@ -30,6 +30,19 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        surname: user.surname || '',
+        bio: user.bio || '',
+        avatar: user.avatar || '',
+        language: user.language || 'ru',
+        theme: user.theme || 'light'
+      });
+    }
+  }, [user]);
 
   const handleSave = async () => {
     setSaving(true);

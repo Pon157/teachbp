@@ -100,6 +100,43 @@ export async function initDb() {
     for (const query of queries) {
       await client.query(query);
     }
+
+    // Database schema migrations
+    const alterHomeworks = [
+      `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'open'`,
+      `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS options JSONB`,
+      `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`
+    ];
+    for (const query of alterHomeworks) {
+      try {
+        await client.query(query);
+      } catch (err) {
+        console.warn('Migration query warning/ignored:', query, err);
+      }
+    }
+
+    // Alter user_progress column homework_response to jsonb if it is not already jsonb
+    try {
+      const checkRes = await client.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'user_progress' AND column_name = 'homework_response'
+      `);
+      if (checkRes.rows.length > 0 && checkRes.rows[0].data_type !== 'jsonb') {
+        await client.query(`
+          ALTER TABLE user_progress ALTER COLUMN homework_response TYPE JSONB USING (
+            CASE 
+              WHEN homework_response IS NULL OR homework_response = '' THEN NULL
+              ELSE to_jsonb(homework_response)
+            END
+          )
+        `);
+        console.log('Successfully altered user_progress.homework_response column to JSONB');
+      }
+    } catch (err) {
+      console.warn('Failed to alter user_progress.homework_response:', err);
+    }
+
     client.release();
     console.log('Database tables initialized successfully.');
   } catch (error) {

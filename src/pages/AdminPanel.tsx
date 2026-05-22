@@ -11,7 +11,8 @@ import {
   ChevronRight,
   UserCheck,
   BookOpen,
-  Trash2
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -19,6 +20,7 @@ import { User, Course } from '../types';
 import { cn } from '../lib/utils';
 
 export default function AdminPanel() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +45,27 @@ export default function AdminPanel() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const deleteUser = async (userId: string) => {
+    if (userId === user?.id) {
+      alert("Вы не можете удалить свою собственную учётную запись");
+      return;
+    }
+    if (!confirm("Вы уверены, что хотите удалить этого пользователя и все связанные с ним данные? Действие необратимо!")) return;
+    try {
+        const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+        if (res.ok) {
+            await fetchData();
+            alert('Пользователь успешно удален');
+        } else {
+            const err = await res.json();
+            alert(err.error || 'Ошибка удаления');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Сетевая ошибка');
+    }
+  };
 
   const assignRole = async (userId: string, role: string) => {
     try {
@@ -205,8 +228,22 @@ export default function AdminPanel() {
                          </td>
                          <td className="px-8 py-6">
                             <div className="flex gap-2">
-                                <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors"><UserCheck size={18} /></button>
-                                <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors"><MoreHorizontal size={18} /></button>
+                                <Link 
+                                    to={`/messages/${u.id}`}
+                                    title="Написать сообщение"
+                                    className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-indigo-500 transition-colors"
+                                >
+                                    <MessageSquare size={18} />
+                                </Link>
+                                {u.id !== user?.id && (
+                                    <button 
+                                        onClick={() => deleteUser(u.id)}
+                                        title="Удалить пользователя"
+                                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-zinc-400 hover:text-red-500 transition-colors"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                )}
                             </div>
                          </td>
                       </tr>

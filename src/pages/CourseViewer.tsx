@@ -156,7 +156,7 @@ export default function CourseViewer() {
               <span className="text-slate-300">/</span>
               <span>{course.title}</span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-none text-slate-900 dark:text-slate-100">{currentBlock?.title}</h1>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight leading-tight text-slate-900 dark:text-slate-100 break-words">{currentBlock?.title}</h1>
             <div className="flex items-center space-x-6">
               {author && (
                 <div className="flex items-center space-x-4">
@@ -180,7 +180,7 @@ export default function CourseViewer() {
           {/* Article Content */}
           <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <article 
-              className="prose prose-slate dark:prose-invert max-w-none break-words overflow-hidden
+              className="prose prose-slate dark:prose-invert max-w-none break-words overflow-x-auto max-w-full
                 prose-h2:text-3xl prose-h2:font-black prose-h2:tracking-tight 
                 prose-p:text-xl prose-p:leading-relaxed prose-p:text-slate-900 dark:prose-p:text-slate-200
                 prose-img:rounded-[2.5rem] prose-img:shadow-2xl prose-img:shadow-slate-100

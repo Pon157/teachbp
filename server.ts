@@ -9,7 +9,7 @@ import nodemailer from 'nodemailer';
 import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
-import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks } from './src/lib/schema.ts';
+import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks, profileComments } from './src/lib/schema.ts';
 import { eq, and, or, desc, asc } from 'drizzle-orm';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
@@ -38,10 +38,34 @@ async function startServer() {
     next();
   });
 
-  // --- Email Transporter (Simulation by default) ---
+  // --- Email Transporter (SMTP + Fallback) ---
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+    },
+  });
+
   const sendEmail = async (to: string, subject: string, html: string) => {
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"TeachBP Support" <${process.env.SMTP_USER}>`,
+          to,
+          subject,
+          html,
+        });
+        console.log(`[EMAIL SUCCESS] Real message dispatched to ${to}`);
+        return;
+      } catch (err) {
+        console.error(`[EMAIL ERROR] SMTP dispatch failed to ${to}:`, err);
+      }
+    }
     console.log('------------------------------------------');
-    console.log(`[EMAIL SIMULATION] To: ${to}, Subject: ${subject}`);
+    console.log(`[EMAIL SIMULATION FALLBACK] To: ${to}, Subject: ${subject}`);
     const codeMatch = html.match(/<b>(\d+)<\/b>/);
     if (codeMatch) console.log(`[CODE]: ${codeMatch[1]}`);
     console.log('------------------------------------------');
@@ -131,11 +155,156 @@ async function startServer() {
     res.json({ message: 'Success' });
   });
 
+  // --- Dynamic Stats & Achievements Engine ---
+  async function calculateUserStatsAndAchievements(userId: string) {
+    try {
+      // 1. Completed blocks
+      const progressList = await db.select().from(userProgress).where(
+        and(eq(userProgress.userId, userId), eq(userProgress.status, 'completed'))
+      );
+      const completedBlocksCount = progressList.length;
+
+      // 2. Count courses where they completed all blocks
+      const allCourses = await db.select().from(courses);
+      const allBlocks = await db.select().from(courseBlocks);
+      
+      let completedCoursesCount = 0;
+      for (const c of allCourses) {
+        const courseBlocksIn = allBlocks.filter(b => b.courseId === c.id);
+        if (courseBlocksIn.length > 0) {
+          const completedBlocksForCourse = progressList.filter(p => courseBlocksIn.some(cb => cb.id === p.blockId));
+          if (completedBlocksForCourse.length === courseBlocksIn.length) {
+            completedCoursesCount++;
+          }
+        }
+      }
+
+      // 3. Messages count
+      const userMessages = await db.select().from(messages).where(
+        or(eq(messages.senderId, userId), eq(messages.receiverId, userId))
+      );
+
+      // 4. Courses created by them
+      const createdCoursesList = await db.select().from(courses).where(eq(courses.authorId, userId));
+      const createdCoursesCount = createdCoursesList.length;
+
+      // 5. Fetch user profile
+      const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+
+      // Evaluate achievements list
+      const achievementsList = [
+        {
+          id: 'first_login',
+          title: 'Первые шаги',
+          description: 'Успешно зарегистрироваться в системе',
+          icon: 'Shield',
+          colorClass: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+          unlocked: true,
+          unlockedAt: user?.createdAt || new Date()
+        },
+        {
+          id: 'profile_filled',
+          title: 'Личность',
+          description: 'Установить аватар и заполнить биографию',
+          icon: 'User',
+          colorClass: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+          unlocked: !!user?.avatar && !!user?.bio && user.bio.trim().length > 0,
+          unlockedAt: new Date()
+        },
+        {
+          id: 'first_lesson',
+          title: 'Первые знания',
+          description: 'Успешно завершить первый урок',
+          icon: 'Trophy',
+          colorClass: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+          unlocked: completedBlocksCount >= 1,
+          unlockedAt: progressList[0]?.updatedAt || new Date()
+        },
+        {
+          id: 'three_lessons',
+          title: 'Ученик',
+          description: 'Успешно завершить 3 урока',
+          icon: 'Activity',
+          colorClass: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
+          unlocked: completedBlocksCount >= 3,
+          unlockedAt: progressList[2]?.updatedAt || new Date()
+        },
+        {
+          id: 'five_lessons',
+          title: 'Знаток',
+          description: 'Пройти 5 уроков на платформе',
+          icon: 'Globe',
+          colorClass: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400',
+          unlocked: completedBlocksCount >= 5,
+          unlockedAt: new Date()
+        },
+        {
+          id: 'course_creator',
+          title: 'Наставник',
+          description: 'Разместить свой собственный авторский курс',
+          icon: 'Trophy',
+          colorClass: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400',
+          unlocked: createdCoursesCount >= 1,
+          unlockedAt: createdCoursesList[0]?.createdAt || new Date()
+        },
+        {
+          id: 'messaging',
+          title: 'Собеседник',
+          description: 'Отправить или получить хотя бы одно личное сообщение',
+          icon: 'Activity',
+          colorClass: 'bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400',
+          unlocked: userMessages.length >= 1,
+          unlockedAt: userMessages[0]?.createdAt || new Date()
+        },
+        {
+          id: 'course_graduate',
+          title: 'Выпускник',
+          description: 'Полностью завершить хотя бы один курс',
+          icon: 'Shield',
+          colorClass: 'bg-pink-50 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400',
+          unlocked: completedCoursesCount >= 1,
+          unlockedAt: new Date()
+        },
+        {
+          id: 'golden_authority',
+          title: 'Авторитет',
+          description: 'Получить роль преподавателя, куратора или администратора',
+          icon: 'User',
+          colorClass: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400',
+          unlocked: user?.role && ['curator', 'teacher', 'admin'].includes(user.role),
+          unlockedAt: new Date()
+        }
+      ];
+
+      return {
+        completedCourses: completedCoursesCount,
+        totalArticles: completedBlocksCount,
+        createdCourses: createdCoursesCount,
+        xp: (completedCoursesCount * 500) + (completedBlocksCount * 50) + (createdCoursesCount * 200),
+        rank: user?.role === 'admin' ? 'Администратор' : user?.role === 'teacher' ? 'Преподаватель' : user?.role === 'curator' ? 'Куратор' : 'Студент',
+        achievements: achievementsList
+      };
+    } catch (err) {
+      console.error('Error calculating user stats:', err);
+      return {
+        completedCourses: 0,
+        totalArticles: 0,
+        createdCourses: 0,
+        xp: 0,
+        rank: 'Студент',
+        achievements: []
+      };
+    }
+  }
+
   app.get('/api/auth/me', authenticate, async (req: any, res) => {
     const user = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'User not found' });
     const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    
+    // Attach dynamically calculated stats and achievements
+    const computedStats = await calculateUserStatsAndAchievements(req.userId);
+    res.json({ ...safeUser, stats: computedStats });
   });
 
   app.post('/api/auth/logout', (req, res) => {
@@ -154,7 +323,49 @@ async function startServer() {
     const user = (await db.select().from(users).where(eq(users.id, req.params.id)).limit(1))[0];
     if (!user) return res.status(404).json({ error: 'Not found' });
     const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    
+    // Attach dynamically calculated stats for other users as well
+    const computedStats = await calculateUserStatsAndAchievements(req.params.id);
+    res.json({ ...safeUser, stats: computedStats });
+  });
+
+  // --- Profile Guestbook Comments ---
+  app.get('/api/users/:id/comments', authenticate, async (req: any, res) => {
+    try {
+      const commentsList = await db.select().from(profileComments)
+        .where(eq(profileComments.profileId, req.params.id))
+        .orderBy(desc(profileComments.createdAt));
+      res.json(commentsList);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json([]);
+    }
+  });
+
+  app.post('/api/users/:id/comments', authenticate, async (req: any, res) => {
+    try {
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: 'Комментарий не может быть пустым' });
+      }
+      const poster = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!poster) return res.status(404).json({ error: 'User not found' });
+
+      await db.insert(profileComments).values({
+        id: uuidv4(),
+        profileId: req.params.id,
+        authorId: req.userId,
+        authorName: `${poster.name} ${poster.surname}`,
+        authorAvatar: poster.avatar,
+        content: content.trim(),
+        createdAt: new Date()
+      });
+
+      res.json({ message: 'Комментарий успешно добавлен' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Ошибка сервера при публикации комментария' });
+    }
   });
 
   // --- Courses ---
@@ -398,6 +609,37 @@ async function startServer() {
   });
 
   // --- Certificates ---
+  app.get('/api/certificates', authenticate, async (req: any, res) => {
+    try {
+      const list = await db.select().from(certificates).where(eq(certificates.userId, req.userId));
+      res.json(list);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json([]);
+    }
+  });
+
+  app.post('/api/certificates', authenticate, async (req: any, res) => {
+    try {
+      const { courseIds } = req.body;
+      const shareId = uuidv4().substring(0, 8);
+      const certId = uuidv4();
+
+      await db.insert(certificates).values({
+        id: certId,
+        userId: req.userId,
+        courseIds: JSON.stringify(courseIds || []),
+        shareId,
+        createdAt: new Date()
+      });
+
+      res.status(201).json({ message: 'Certificate created successfully', shareId });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'ошибка сервера при генерации сертификата' });
+    }
+  });
+
   app.get('/api/verify-certificate/:shareId', async (req, res) => {
     const cert = (await db.select().from(certificates).where(eq(certificates.shareId, req.params.shareId)).limit(1))[0];
     if (!cert) return res.status(404).json({ error: 'Not found' });

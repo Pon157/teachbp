@@ -465,12 +465,34 @@ export default function EditorPage() {
                       <div className="relative aspect-video rounded-3xl bg-slate-50 dark:bg-slate-800 overflow-hidden border border-slate-100 dark:border-slate-800 mb-2">
                          {imageUrl ? <img src={imageUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={40} className="text-slate-200" /></div>}
                       </div>
-                      <input 
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-bold outline-none"
-                        value={imageUrl}
-                        onChange={e => setImageUrl(e.target.value)}
-                        placeholder="URL изображения..."
-                      />
+                      <div className="flex gap-2">
+                         <input 
+                           className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-bold outline-none font-sans"
+                           value={imageUrl}
+                           onChange={e => setImageUrl(e.target.value)}
+                           placeholder="URL изображения..."
+                         />
+                         <label className="bg-indigo-600 text-white px-4.5 py-3 rounded-xl text-xs font-black cursor-pointer hover:bg-indigo-700 transition-all flex items-center justify-center gap-1 shrink-0">
+                            <span>Загрузить</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                 const file = e.target.files?.[0];
+                                 if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                       if (typeof reader.result === 'string') {
+                                          setImageUrl(reader.result);
+                                       }
+                                    };
+                                    reader.readAsDataURL(file);
+                                 }
+                              }}
+                            />
+                         </label>
+                      </div>
                   </div>
 
                   <div className="space-y-3">

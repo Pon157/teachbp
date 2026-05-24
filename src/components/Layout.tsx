@@ -13,7 +13,8 @@ import {
   ChevronDown,
   Moon,
   Sun,
-  Code2
+  Code2,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -26,10 +27,13 @@ export default function Layout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [theme, setTheme] = useState(user?.theme || 'light');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || user?.theme || 'light');
 
   useEffect(() => {
-    if (user?.theme) {
+    const saved = localStorage.getItem('theme');
+    if (saved) {
+      setTheme(saved);
+    } else if (user?.theme) {
       setTheme(user.theme);
     }
   }, [user?.theme]);
@@ -41,6 +45,7 @@ export default function Layout() {
             .then(setNotifications);
     }
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
   }, [user, theme]);
 
   const handleLogout = async () => {
@@ -51,6 +56,7 @@ export default function Layout() {
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
     fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -63,6 +69,9 @@ export default function Layout() {
     { label: 'Сообщения', path: '/messages', icon: MessageSquare },
   ];
 
+  if (user?.role === 'curator' || user?.role === 'teacher' || user?.role === 'admin') {
+    navItems.push({ label: 'Куратор', path: '/curator', icon: ClipboardList });
+  }
   if (user?.role === 'teacher' || user?.role === 'admin') {
     navItems.push({ label: 'Редактор', path: '/editor', icon: PenTool });
   }

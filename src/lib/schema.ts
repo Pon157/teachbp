@@ -78,3 +78,13 @@ export const certificates = pgTable('certificates', {
   shareId: text('share_id').notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const profileComments = pgTable('profile_comments', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  authorName: text('author_name').notNull(),
+  authorAvatar: text('author_avatar'),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

@@ -92,6 +92,15 @@ export async function initDb() {
       course_ids TEXT NOT NULL,
       share_id TEXT NOT NULL UNIQUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS profile_comments (
+      id TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      author_avatar TEXT,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`
   ];
 

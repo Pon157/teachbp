@@ -173,8 +173,23 @@ async function startServer() {
       for (const c of allCourses) {
         const courseBlocksIn = allBlocks.filter(b => b.courseId === c.id);
         if (courseBlocksIn.length > 0) {
-          const completedBlocksForCourse = progressList.filter(p => courseBlocksIn.some(cb => cb.id === p.blockId));
-          if (completedBlocksForCourse.length === courseBlocksIn.length) {
+          let courseCompleted = true;
+          for (const block of courseBlocksIn) {
+            const blockProg = progressList.find(p => p.blockId === block.id);
+            if (!blockProg || blockProg.status !== 'completed') {
+              courseCompleted = false;
+              break;
+            }
+            // Check if there are open homework tasks
+            const blockTasks = await db.select().from(homeworks).where(
+              and(eq(homeworks.blockId, block.id), eq(homeworks.type, 'open'))
+            );
+            if (blockTasks.length > 0 && blockProg.grade !== 'accepted') {
+              courseCompleted = false;
+              break;
+            }
+          }
+          if (courseCompleted) {
             completedCoursesCount++;
           }
         }
@@ -594,6 +609,7 @@ async function startServer() {
         await db.update(userProgress).set({
             homeworkResponse,
             status: 'completed',
+            grade: null,
             updatedAt: new Date()
         }).where(eq(userProgress.id, existing.id));
     } else {
@@ -603,10 +619,120 @@ async function startServer() {
             blockId,
             homeworkResponse,
             status: 'completed',
+            grade: null,
             updatedAt: new Date()
         });
     }
     res.json({ message: 'Success' });
+  });
+
+  // --- Curator Endpoints ---
+  app.get('/api/curator/submissions', authenticate, async (req: any, res) => {
+    try {
+      const curator = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!curator || !['curator', 'teacher', 'admin'].includes(curator.role)) {
+        return res.status(403).json({ error: 'Доступ разрешен только кураторам, преподавателям и администраторам.' });
+      }
+
+      // Fetch students
+      let students;
+      if (curator.role === 'admin' || curator.role === 'teacher') {
+        students = await db.select().from(users);
+      } else {
+        students = await db.select().from(users).where(eq(users.curatorId, req.userId));
+      }
+
+      if (students.length === 0) {
+        return res.json([]);
+      }
+
+      const studentIds = students.map(s => s.id);
+      
+      // Get all userProgress records for these students
+      const progressRecords = await db.select().from(userProgress).where(
+        or(...studentIds.map(sid => eq(userProgress.userId, sid)))
+      );
+
+      const results: any[] = [];
+      for (const record of progressRecords) {
+        if (!record.homeworkResponse || Object.keys(record.homeworkResponse).length === 0) {
+          continue;
+        }
+
+        const student = students.find(s => s.id === record.userId);
+        const block = (await db.select().from(courseBlocks).where(eq(courseBlocks.id, record.blockId)).limit(1))[0];
+        if (!block) continue;
+
+        const course = (await db.select().from(courses).where(eq(courses.id, block.courseId)).limit(1))[0];
+        if (!course) continue;
+
+        // Fetch homework tasks for this block
+        const tasks = await db.select().from(homeworks).where(eq(homeworks.blockId, block.id));
+        
+        results.push({
+          progressId: record.id,
+          user: student ? { id: student.id, name: student.name, surname: student.surname, email: student.email, avatar: student.avatar } : null,
+          block: { id: block.id, title: block.title },
+          course: { id: course.id, title: course.title },
+          homeworkResponse: record.homeworkResponse,
+          grade: record.grade,
+          feedback: record.feedback,
+          tasks,
+          updatedAt: record.updatedAt
+        });
+      }
+
+      results.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      res.json(results);
+    } catch (err) {
+      console.error('Error fetching curator submissions:', err);
+      res.status(500).json({ error: 'Ошибка сервера' });
+    }
+  });
+
+  app.post('/api/curator/submissions/:id/grade', authenticate, async (req: any, res) => {
+    try {
+      const curator = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!curator || !['curator', 'teacher', 'admin'].includes(curator.role)) {
+        return res.status(403).json({ error: 'Доступ ограничен' });
+      }
+
+      const { grade, feedback } = req.body;
+      if (!['accepted', 'rejected', 'needs_revision'].includes(grade)) {
+        return res.status(400).json({ error: 'Неверная оценка' });
+      }
+
+      const submission = (await db.select().from(userProgress).where(eq(userProgress.id, req.params.id)).limit(1))[0];
+      if (!submission) return res.status(404).json({ error: 'Работа не найдена' });
+
+      await db.update(userProgress).set({
+        grade,
+        feedback,
+        updatedAt: new Date()
+      }).where(eq(userProgress.id, req.params.id));
+
+      const block = (await db.select().from(courseBlocks).where(eq(courseBlocks.id, submission.blockId)).limit(1))[0];
+      const blockTitle = block ? block.title : 'уроку';
+
+      let statusText = '';
+      if (grade === 'accepted') statusText = 'принято и зачтено! 🎉';
+      else if (grade === 'rejected') statusText = 'отклонено куратором. ❌';
+      else if (grade === 'needs_revision') statusText = 'отправлено на доработку. Она требует исправлений перед зачетом. ⚠️';
+
+      await db.insert(notifications).values({
+        id: uuidv4(),
+        userId: submission.userId,
+        message: `Ваше задание по теме "${blockTitle}" было проверено куратором: ${statusText}${feedback ? ` Замечания куратора: "${feedback}"` : ''}`,
+        type: grade === 'accepted' ? 'success' : 'warning',
+        read: false,
+        createdAt: new Date()
+      });
+
+      res.json({ message: 'Success' });
+    } catch (err) {
+      console.error('Error grading submission:', err);
+      res.status(500).json({ error: 'Ошибка сервера при оценке задания' });
+    }
   });
 
   // --- Certificates ---
@@ -633,6 +759,12 @@ async function startServer() {
   app.post('/api/certificates', authenticate, async (req: any, res) => {
     try {
       const { courseIds } = req.body;
+      
+      const stats = await calculateUserStatsAndAchievements(req.userId);
+      if (stats.completedCourses === 0) {
+        return res.status(400).json({ error: 'Вы не завершили полностью ни одного курса! Пожалуйста, убедитесь, что куратор проверил и одобрил все ваши домашние задания.' });
+      }
+
       const shareId = uuidv4().substring(0, 8);
       const certId = uuidv4();
 

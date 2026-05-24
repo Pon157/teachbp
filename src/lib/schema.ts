@@ -50,7 +50,8 @@ export const userProgress = pgTable('user_progress', {
   blockId: text('block_id').notNull().references(() => courseBlocks.id, { onDelete: 'cascade' }),
   status: text('status').$type<'unlocked' | 'completed'>().default('unlocked'),
   homeworkResponse: jsonb('homework_response'), // Record<taskId, value>
-  grade: text('grade'), // 'accepted', 'rejected', null
+  grade: text('grade'), // 'accepted', 'rejected', 'needs_revision', null
+  feedback: text('feedback'), // Curator feedback
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

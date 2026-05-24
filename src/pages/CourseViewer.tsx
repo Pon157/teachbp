@@ -107,6 +107,21 @@ export default function CourseViewer() {
   );
   if (!course) return <div className="h-full flex items-center justify-center text-red-500">Курс не найден</div>;
 
+  if (!course.blocks || course.blocks.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto py-24 text-center space-y-6">
+         <div className="w-20 h-20 mx-auto bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl flex items-center justify-center">
+            <GraduationCap size={40} className="text-indigo-600 dark:text-indigo-400" />
+         </div>
+         <h1 className="text-3xl font-black text-slate-900 dark:text-white">В этом курсе еще нет уроков</h1>
+         <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto font-medium">Автор курса пока не добавил ни одного учебного материала.</p>
+         <Link to="/dashboard" className="inline-block px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm transition-all hover:bg-indigo-700 hover:-translate-y-1">
+            Вернуться на главную
+         </Link>
+      </div>
+    );
+  }
+
   const currentBlock = course.blocks[currentBlockIndex];
   const progress = ((currentBlockIndex + 1) / course.blocks.length) * 100;
   const isLastBlock = currentBlockIndex === course.blocks.length - 1;

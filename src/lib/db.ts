@@ -69,6 +69,7 @@ export async function initDb() {
       status TEXT DEFAULT 'unlocked',
       homework_response TEXT,
       grade TEXT,
+      feedback TEXT,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS notifications (
@@ -114,7 +115,8 @@ export async function initDb() {
     const alterHomeworks = [
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'open'`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS options JSONB`,
-      `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`
+      `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`,
+      `ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS feedback TEXT`
     ];
     for (const query of alterHomeworks) {
       try {

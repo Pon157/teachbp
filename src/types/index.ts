@@ -60,3 +60,14 @@ export interface Message {
   content: string;
   createdAt: string;
 }
+
+export interface UserProgress {
+  id: string;
+  userId: string;
+  blockId: string;
+  status: 'unlocked' | 'completed';
+  homeworkResponse?: any; // Record<taskId, string>
+  grade?: 'accepted' | 'rejected' | 'needs_revision' | null;
+  feedback?: string | null;
+  updatedAt: string;
+}

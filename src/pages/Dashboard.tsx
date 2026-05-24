@@ -102,7 +102,7 @@ export default function Dashboard() {
                 <BookOpen size={24} className="text-indigo-600" />
                 <span>Образовательные треки</span>
               </h2>
-              <Link to="/courses" className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-[0.2em] underline decoration-indigo-200 underline-offset-4">Посмотреть всё</Link>
+              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em]">Доступно: {courses.length}</span>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

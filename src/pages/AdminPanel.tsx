@@ -32,11 +32,16 @@ export default function AdminPanel() {
     try {
       const [usersRes, coursesRes] = await Promise.all([
         fetch('/api/admin/users'),
-        fetch('/api/courses') // For courses we need a special admin endpoint usually, but I'll adapt the current one or just use it
+        fetch('/api/courses')
       ]);
-      setUsers(await usersRes.json());
-      // For demo, I'll fetch and filter if I can, or just mock some pending courses
-      setCourses(await coursesRes.json());
+      const usersData = await usersRes.json();
+      const coursesData = await coursesRes.json();
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
+    } catch (err) {
+      console.error(err);
+      setUsers([]);
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -136,6 +141,25 @@ export default function AdminPanel() {
   const filteredUsers = users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) return <div className="h-full flex items-center justify-center font-mono opacity-50">FETCHING CLOUD DATA...</div>;
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="py-20 max-w-lg mx-auto text-center space-y-6">
+        <div className="w-16 h-16 bg-rose-100 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-3xl flex items-center justify-center mx-auto animate-pulse">
+          <Shield size={32} />
+        </div>
+        <h2 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Доступ ограничен</h2>
+        <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+          Этот раздел предназначен исключительно для Администраторов образовательной платформы. Ваш текущий уровень доступа: <span className="font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest text-xs bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded">{user?.role === 'teacher' ? 'Преподаватель' : user?.role === 'curator' ? 'Куратор' : 'Студент'}</span>
+        </p>
+        <div>
+          <Link to="/dashboard" className="inline-flex px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+            Вернуться на главную
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">

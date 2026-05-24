@@ -9,6 +9,7 @@ import CourseViewer from './pages/CourseViewer';
 import EditorPage from './pages/EditorPage';
 import AdminPanel from './pages/AdminPanel';
 import MessagesPage from './pages/MessagesPage';
+import CuratorPanel from './pages/CuratorPanel';
 import VerifyCertificate from './pages/VerifyCertificate';
 import NotFound from './pages/NotFound';
 
@@ -60,6 +61,11 @@ export default function App() {
             <Route path="/admin" element={
               <ProtectedRoute roles={['admin']}>
                 <AdminPanel />
+              </ProtectedRoute>
+            } />
+            <Route path="/curator" element={
+              <ProtectedRoute roles={['curator', 'teacher', 'admin']}>
+                <CuratorPanel />
               </ProtectedRoute>
             } />
           </Route>

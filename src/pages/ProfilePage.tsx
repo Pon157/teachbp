@@ -19,9 +19,9 @@ import {
   Calendar,
   Award,
   Lock,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
 export default function ProfilePage() {
@@ -52,6 +52,9 @@ export default function ProfilePage() {
   const [newComment, setNewComment] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
 
+  // Certificates
+  const [certs, setCerts] = useState<any[]>([]);
+
   // Load profile user details (and fallback/refresh own user)
   const fetchProfileData = async () => {
     try {
@@ -79,6 +82,13 @@ export default function ProfilePage() {
       if (commentsRes.ok) {
         const commentsData = await commentsRes.json();
         setComments(commentsData);
+      }
+
+      // Load certificates for the target profile
+      const certsRes = await fetch(`/api/users/${targetId}/certificates`);
+      if (certsRes.ok) {
+        const certsData = await certsRes.json();
+        setCerts(certsData);
       }
     } catch (err) {
       console.error('Error fetching profile data:', err);
@@ -146,7 +156,7 @@ export default function ProfilePage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center font-mono text-xs uppercase tracking-widest text-slate-400">
         <RefreshCcw className="animate-spin mb-4 text-indigo-600" size={24} />
-        <span>Загрузка профиля...</span>
+         <span>Загрузка профиля...</span>
       </div>
     );
   }
@@ -323,57 +333,141 @@ export default function ProfilePage() {
       <div>
         {(!isOwnProfile || activeTab === 'profile') ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-             {/* Left Column: Achievements Gallery with accurate integration */}
-             <section className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-10 rounded-[2.5rem] shadow-sm space-y-8">
-                <div className="flex justify-between items-center pb-6 border-b border-slate-100 dark:border-slate-800">
-                   <h3 className="text-xl font-black text-slate-950 dark:text-slate-50 flex items-center gap-3">
-                      <Trophy size={20} className="text-indigo-600" />
-                      <span>Система достижений</span>
-                   </h3>
-                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
-                      Получено: {stats.achievements ? stats.achievements.filter((a: any) => a.unlocked).length : 0} / {stats.achievements ? stats.achievements.length : 0}
-                   </span>
-                </div>
+             {/* Left Column: Achievements Gallery & Certificates */}
+             <div className="lg:col-span-8 space-y-8">
+                <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-10 rounded-[2.5rem] shadow-sm space-y-8">
+                   <div className="flex justify-between items-center pb-6 border-b border-slate-100 dark:border-slate-800">
+                      <h3 className="text-xl font-black text-slate-950 dark:text-slate-50 flex items-center gap-3">
+                         <Trophy size={20} className="text-indigo-600" />
+                         <span>Система достижений</span>
+                      </h3>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                         Получено: {stats.achievements ? stats.achievements.filter((a: any) => a.unlocked).length : 0} / {stats.achievements ? stats.achievements.length : 0}
+                      </span>
+                   </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                   {stats.achievements && stats.achievements.length > 0 ? (
-                     stats.achievements.map((item: any) => {
-                       const IconComp = getAchievementIcon(item.icon);
-                       return (
-                         <div 
-                           key={item.id} 
-                           className={cn(
-                             "p-5 rounded-2xl border flex items-start gap-4 transition-all relative group",
-                             item.unlocked 
-                               ? "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800 hover:shadow-lg hover:shadow-slate-100 dark:hover:shadow-none" 
-                               : "bg-slate-100/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-900/60 opacity-60"
-                           )}
-                         >
-                           <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105", item.colorClass)}>
-                               <IconComp size={24} />
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                      {stats.achievements && stats.achievements.length > 0 ? (
+                        stats.achievements.map((item: any) => {
+                          const IconComp = getAchievementIcon(item.icon);
+                          return (
+                            <div 
+                              key={item.id} 
+                              className={cn(
+                                "p-5 rounded-2xl border flex items-start gap-4 transition-all relative group",
+                                item.unlocked 
+                                  ? "bg-slate-50/50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800 hover:shadow-lg hover:shadow-slate-100 dark:hover:shadow-none" 
+                                  : "bg-slate-100/30 dark:bg-slate-950/20 border-slate-100 dark:border-slate-900/60 opacity-60"
+                              )}
+                            >
+                              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105", item.colorClass)}>
+                                  <IconComp size={24} />
+                              </div>
+                              <div className="flex-1 min-w-0 pr-2">
+                                  <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <span>{item.title}</span>
+                                    {item.unlocked ? (
+                                      <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+                                    ) : (
+                                      <Lock size={12} className="text-slate-400 dark:text-slate-600 flex-shrink-0" />
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed mt-1">{item.description}</p>
+                                  {item.unlocked && item.unlockedAt && (
+                                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider mt-2">Получено: {new Date(item.unlockedAt).toLocaleDateString()}</p>
+                                  )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-full py-12 text-center text-slate-400 font-mono text-xs">Достижения отсутствуют.</div>
+                      )}
+                   </div>
+                </section>
+
+                {/* Certificates Section */}
+                <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 sm:p-10 rounded-[2.5rem] shadow-sm space-y-6">
+                   <div className="flex justify-between items-center pb-6 border-b border-slate-100 dark:border-slate-800">
+                      <h3 className="text-xl font-black text-slate-950 dark:text-slate-50 flex items-center gap-3">
+                         <Award size={22} className="text-indigo-600" />
+                         <span>Полученные сертификаты</span>
+                      </h3>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                         Всего: {certs.length}
+                      </span>
+                   </div>
+
+                   {certs.length > 0 ? (
+                     <div className="space-y-6">
+                       {certs.map((cert) => {
+                         const courseNames = JSON.parse(cert.courseIds || '[]');
+                         const verificationUrl = `${window.location.origin}/verify/${cert.shareId}`;
+                         return (
+                           <div key={cert.id} className="p-6 bg-slate-50/50 dark:bg-slate-800/10 border border-slate-200 dark:border-slate-800 rounded-[1.8rem] flex flex-col md:flex-row gap-6 items-start md:items-center justify-between hover:shadow-md transition-all">
+                             <div className="flex items-start gap-4 flex-1">
+                               <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center flex-shrink-0 font-bold">
+                                 <Award size={26} />
+                               </div>
+                               <div className="space-y-1 min-w-0 flex-1">
+                                 <h4 className="font-extrabold text-base text-slate-950 dark:text-slate-50 tracking-tight flex items-center gap-2">
+                                   <span>Сертификат Специалиста</span>
+                                   <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-md shrink-0">Подтвержден</span>
+                                 </h4>
+                                 <p className="text-xs text-slate-505 dark:text-slate-400 font-medium">
+                                   ID Документа: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">{cert.shareId}</span> • Дата: {new Date(cert.createdAt).toLocaleDateString()}
+                                 </p>
+                                 <div className="flex flex-wrap gap-1.5 mt-2">
+                                   {courseNames.map((name: string, i: number) => (
+                                     <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-extrabold px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
+                                       {name}
+                                     </span>
+                                   ))}
+                                 </div>
+                               </div>
+                             </div>
+
+                             <div className="flex gap-2 w-full md:w-auto self-stretch md:self-auto justify-end">
+                               <Link 
+                                 to={`/verify/${cert.shareId}`}
+                                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all inline-flex items-center justify-center gap-1.5"
+                               >
+                                 <span>Открыть</span>
+                                 <ExternalLink size={13} />
+                               </Link>
+                               <button
+                                 onClick={() => {
+                                   try {
+                                     navigator.clipboard.writeText(verificationUrl);
+                                     alert('Ссылка скопирована!');
+                                   } catch (e) {
+                                     const textArea = document.createElement("textarea");
+                                     textArea.value = verificationUrl;
+                                     textArea.style.position = "fixed";
+                                     textArea.style.opacity = "0";
+                                     document.body.appendChild(textArea);
+                                     textArea.select();
+                                     document.execCommand('copy');
+                                     document.body.removeChild(textArea);
+                                     alert('Ссылка скопирована!');
+                                   }
+                                 }}
+                                 className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all border border-slate-200 dark:border-slate-750"
+                               >
+                                 Ссылка
+                               </button>
+                             </div>
                            </div>
-                           <div className="flex-1 min-w-0 pr-2">
-                               <p className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                 <span>{item.title}</span>
-                                 {item.unlocked ? (
-                                   <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
-                                 ) : (
-                                   <Lock size={12} className="text-slate-400 dark:text-slate-600 flex-shrink-0" />
-                                 )}
-                               </p>
-                               <p className="text-xs text-slate-600 dark:text-slate-400 font-medium leading-relaxed mt-1">{item.description}</p>
-                               {item.unlocked && item.unlockedAt && (
-                                 <p className="text-[9px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider mt-2">Получено: {new Date(item.unlockedAt).toLocaleDateString()}</p>
-                               )}
-                           </div>
-                         </div>
-                       );
-                     })
+                         );
+                       })}
+                     </div>
                    ) : (
-                     <div className="col-span-full py-12 text-center text-slate-400 font-mono text-xs">Достижения отсутствуют.</div>
+                     <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-medium italic text-sm border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                       У этого пользователя пока нет сгенерированных сертификатов.
+                     </div>
                    )}
-                </div>
-             </section>
+                </section>
+             </div>
 
              {/* Right Column: User Analytics */}
              <div className="lg:col-span-4 space-y-8">
@@ -435,7 +529,7 @@ export default function ProfilePage() {
                           <div className="space-y-2">
                               <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 ml-1">О себе (Био)</label>
                               <textarea 
-                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3 text-sm font-medium outline-none resize-none h-24 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-500/25 transition-all"
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-500/25 transition-all resize-none h-24"
                                   value={formData.bio}
                                   onChange={e => setFormData({...formData, bio: e.target.value})}
                                   placeholder="Пара слов о вашем опыте и целях в образовании..."
@@ -445,8 +539,8 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-6">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Настройки системы</h4>
-                      <div className="space-y-8 text-slate-900 dark:text-slate-100">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Настройки среды</h4>
+                      <div className="space-y-5">
                           <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
                               <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -468,13 +562,13 @@ export default function ProfilePage() {
                               <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                                    <button 
                                       onClick={() => setFormData({...formData, theme: 'light'})}
-                                      className={cn("p-1.5 rounded-lg transition-all", formData.theme === 'light' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                                      className={cn("px-3 py-1.5 rounded-lg text-xs font-bold transition-all", formData.theme === 'light' ? "bg-white dark:bg-slate-900 shadow text-slate-900 dark:text-slate-100" : "text-slate-400")}
                                    >
                                       <Sun size={14} />
                                    </button>
                                    <button 
                                       onClick={() => setFormData({...formData, theme: 'dark'})}
-                                      className={cn("p-1.5 rounded-lg transition-all", formData.theme === 'dark' ? "bg-slate-700 text-indigo-400 shadow-sm" : "text-slate-400 hover:text-slate-600")}
+                                      className={cn("px-3 py-1.5 rounded-lg text-xs font-bold transition-all", formData.theme === 'dark' ? "bg-white dark:bg-slate-900 shadow text-slate-900 dark:text-slate-100" : "text-slate-400")}
                                    >
                                       <Moon size={14} />
                                    </button>
@@ -490,7 +584,7 @@ export default function ProfilePage() {
                               <select 
                                 value={formData.language}
                                 onChange={e => setFormData({...formData, language: e.target.value})}
-                                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1 text-xs font-bold"
+                                className="bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-350 outline-none"
                               >
                                 <option value="ru">Русский (RU)</option>
                                 <option value="en">English (EN)</option>

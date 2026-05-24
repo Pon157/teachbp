@@ -28,56 +28,71 @@ export default function CourseViewer() {
   const [homeworkResponses, setHomeworkResponses] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [completedBlocks, setCompletedBlocks] = useState<string[]>([]);
+  const [progressList, setProgressList] = useState<any[]>([]);
+
+  const fetchCourseData = async () => {
+    try {
+        const [courseRes, progressRes] = await Promise.all([
+          fetch(`/api/courses/${id}`),
+          fetch(`/api/progress/${id}`)
+        ]);
+        
+        const data = await courseRes.json();
+        const progressData = await progressRes.json();
+        
+        if (!courseRes.ok) {
+          setError(data.error || 'Ошибка при загрузке курса');
+          setLoading(false);
+          return;
+        }
+
+        setCourse(data);
+        setProgressList(progressData);
+        setCompletedBlocks(progressData.filter((p: any) => p.status === 'completed').map((p: any) => p.blockId));
+        
+        if (data.authorId) {
+          const authorRes = await fetch(`/api/users/${data.authorId}`);
+          const authorData = await authorRes.json();
+          setAuthor(authorData);
+        }
+    } catch (err) {
+        setError('Сетевая ошибка');
+    } finally {
+        setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      try {
-          const [courseRes, progressRes] = await Promise.all([
-            fetch(`/api/courses/${id}`),
-            fetch(`/api/progress/${id}`)
-          ]);
-          
-          const data = await courseRes.json();
-          const progressData = await progressRes.json();
-          
-          if (!courseRes.ok) {
-            setError(data.error || 'Ошибка при загрузке курса');
-            setLoading(false);
-            return;
-          }
-
-          setCourse(data);
-          setCompletedBlocks(progressData.filter((p: any) => p.status === 'completed').map((p: any) => p.blockId));
-          
-          if (data.authorId) {
-            const authorRes = await fetch(`/api/users/${data.authorId}`);
-            const authorData = await authorRes.json();
-            setAuthor(authorData);
-          }
-      } catch (err) {
-          setError('Сетевая ошибка');
-      } finally {
-          setLoading(false);
-      }
-    };
-    fetchCourse();
+    fetchCourseData();
   }, [id]);
+
+  // Sync previous homework response if exists
+  useEffect(() => {
+    if (course?.blocks && course.blocks[currentBlockIndex]) {
+      const block = course.blocks[currentBlockIndex];
+      const prog = progressList.find((p: any) => p.blockId === block.id);
+      if (prog && prog.homeworkResponse) {
+        setHomeworkResponses(prog.homeworkResponse);
+      } else {
+        setHomeworkResponses({});
+      }
+    }
+  }, [currentBlockIndex, course, progressList]);
 
   const handleCompleteBlock = async () => {
     setSubmitting(true);
     try {
       const block = course!.blocks[currentBlockIndex];
-      await fetch('/api/progress/complete-block', {
+      const res = await fetch('/api/progress/complete-block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blockId: block.id, homeworkResponse: homeworkResponses })
       });
       
-      setCompletedBlocks([...completedBlocks, block.id]);
+      await fetchCourseData(); // Reload stats and achievements progress lists!
       
       if (currentBlockIndex < course!.blocks.length - 1) {
         setCurrentBlockIndex(currentBlockIndex + 1);
-        setHomeworkResponses({});
       } else {
         confetti({
           particleCount: 150,
@@ -126,7 +141,17 @@ export default function CourseViewer() {
   const progress = ((currentBlockIndex + 1) / course.blocks.length) * 100;
   const isLastBlock = currentBlockIndex === course.blocks.length - 1;
   const hasTasks = currentBlock.homeworks && currentBlock.homeworks.length > 0;
-  const allTasksAnswered = !hasTasks || currentBlock.homeworks?.every(t => homeworkResponses[t.id]);
+  
+  const allTasksAnswered = !hasTasks || currentBlock.homeworks?.every(t => {
+    if (t.type === 'quiz' && t.correctAnswer) {
+      return homeworkResponses[t.id] === t.correctAnswer;
+    }
+    return !!homeworkResponses[t.id];
+  });
+
+  const currentProg = progressList?.find((p: any) => p.blockId === currentBlock?.id);
+  const blockGrade = currentProg?.grade;
+  const curatorFeedback = currentProg?.feedback;
 
   return (
     <div className="max-w-4xl mx-auto pb-24">
@@ -218,6 +243,40 @@ export default function CourseViewer() {
                 <span>Практика</span>
               </h2>
 
+              {/* Curator Feedback Card */}
+              {currentProg && (blockGrade || curatorFeedback) && (
+                <div className={cn(
+                  "p-8 rounded-[2rem] border relative overflow-hidden mb-8",
+                  blockGrade === 'accepted' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-205" :
+                  blockGrade === 'needs_revision' ? "bg-amber-500/10 border-amber-500/30 text-amber-200" :
+                  "bg-rose-500/10 border-rose-500/30 text-rose-205"
+                )}>
+                  <div className="flex items-center gap-3 mb-3 font-bold text-lg">
+                    <span>Решение проверено куратором:</span>
+                    <span className={cn(
+                      "px-3 py-1 rounded text-xs font-black uppercase tracking-wide",
+                      blockGrade === 'accepted' ? "bg-emerald-500 text-slate-900" :
+                      blockGrade === 'needs_revision' ? "bg-amber-500 text-slate-900" :
+                      "bg-rose-500 text-white"
+                    )}>
+                      {blockGrade === 'accepted' ? 'Принято 🎉' :
+                       blockGrade === 'needs_revision' ? 'На доработку ⚠️' :
+                       'Отклонено ❌'}
+                    </span>
+                  </div>
+                  {curatorFeedback && (
+                    <div className="bg-white/5 p-4 rounded-xl text-slate-300 italic max-w-full font-medium mt-1 leading-relaxed border border-white/5">
+                      "{curatorFeedback}"
+                    </div>
+                  )}
+                  {blockGrade === 'needs_revision' && (
+                    <div className="text-amber-400 text-xs mt-3 font-black flex items-center gap-1">
+                      <span>Пожалуйста, исправьте указанные ошибки и отправьте решение повторно!</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-10">
                 {currentBlock.homeworks?.map((task, idx) => (
                   <div key={task.id} className="space-y-6">
@@ -227,21 +286,57 @@ export default function CourseViewer() {
                     </div>
 
                     {task.type === 'quiz' ? (
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-12">
-                          {task.options?.map((opt: string) => (
-                             <button 
-                                key={opt}
-                                onClick={() => setHomeworkResponses({ ...homeworkResponses, [task.id]: opt })}
-                                className={cn(
-                                   "p-5 rounded-2xl border text-left font-bold transition-all text-sm",
-                                   homeworkResponses[task.id] === opt 
-                                   ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-900/40" 
-                                   : "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
-                                )}
-                             >
-                                {opt}
-                             </button>
-                          ))}
+                       <div className="space-y-4 ml-12">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                             {(() => {
+                               const opts = typeof task.options === 'string'
+                                 ? (() => { try { return JSON.parse(task.options); } catch { return []; } })()
+                                 : (Array.isArray(task.options) ? task.options : []);
+
+                               return opts.map((opt: string) => {
+                                 const isSelected = homeworkResponses[task.id] === opt;
+                                 const isCorrect = task.correctAnswer ? opt === task.correctAnswer : true;
+
+                                 let btnClasses = "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300";
+                                 if (isSelected) {
+                                   if (task.correctAnswer) {
+                                     btnClasses = isCorrect 
+                                       ? "bg-emerald-600/30 border-emerald-500 text-emerald-200 shadow-lg"
+                                       : "bg-rose-600/30 border-rose-500 text-rose-200 shadow-lg";
+                                   } else {
+                                     btnClasses = "bg-indigo-600 border-indigo-600 text-white shadow-lg";
+                                   }
+                                 }
+
+                                 return (
+                                   <button 
+                                      key={opt}
+                                      type="button"
+                                      onClick={() => setHomeworkResponses({ ...homeworkResponses, [task.id]: opt })}
+                                      className={cn(
+                                         "p-5 rounded-2xl border text-left font-bold transition-all text-sm flex items-center justify-between",
+                                         btnClasses
+                                      )}
+                                   >
+                                      <span>{opt}</span>
+                                      {isSelected && task.correctAnswer && (
+                                        <span className={cn(
+                                          "text-[10px] font-black uppercase px-2 py-0.5 rounded",
+                                          isCorrect ? "bg-emerald-500/20 text-emerald-350" : "bg-rose-500/20 text-rose-350"
+                                        )}>
+                                          {isCorrect ? '✓ Верно' : '✗ Неверно'}
+                                        </span>
+                                      )}
+                                   </button>
+                                 );
+                               });
+                             })()}
+                          </div>
+                          {task.correctAnswer && homeworkResponses[task.id] && homeworkResponses[task.id] !== task.correctAnswer && (
+                            <p className="text-rose-400 text-xs font-bold leading-none">
+                              Выбран неверный вариант ответа. Обдумайте решение и выберите другой вариант!
+                            </p>
+                          )}
                        </div>
                     ) : (
                         <textarea 

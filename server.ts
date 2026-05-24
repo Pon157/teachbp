@@ -29,7 +29,8 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use(cookieParser());
 
   // Logging middleware
@@ -612,6 +613,16 @@ async function startServer() {
   app.get('/api/certificates', authenticate, async (req: any, res) => {
     try {
       const list = await db.select().from(certificates).where(eq(certificates.userId, req.userId));
+      res.json(list);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json([]);
+    }
+  });
+
+  app.get('/api/users/:id/certificates', async (req, res) => {
+    try {
+      const list = await db.select().from(certificates).where(eq(certificates.userId, req.params.id));
       res.json(list);
     } catch (err) {
       console.error(err);

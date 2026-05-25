@@ -451,9 +451,10 @@ async function startServer() {
       const poster = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
       if (!poster) return res.status(404).json({ error: 'User not found' });
 
+      const targetProfileId = req.params.id;
       await db.insert(profileComments).values({
         id: uuidv4(),
-        profileId: req.params.id,
+        profileId: targetProfileId,
         authorId: req.userId,
         authorName: `${poster.name} ${poster.surname}`,
         authorAvatar: poster.avatar,
@@ -461,10 +462,122 @@ async function startServer() {
         createdAt: new Date()
       });
 
+      // Send notification to the profile owner if they aren't the poster
+      if (targetProfileId !== req.userId) {
+        await db.insert(notifications).values({
+          id: uuidv4(),
+          userId: targetProfileId,
+          message: `${poster.name} ${poster.surname} оставил(а) новый отзыв в вашей гостевой книге!`,
+          type: 'new_message',
+          read: false,
+          link: `/profile`,
+          createdAt: new Date()
+        });
+      }
+
       res.json({ message: 'Комментарий успешно добавлен' });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Ошибка сервера при публикации комментария' });
+    }
+  });
+
+  app.post('/api/comments/:id/like', authenticate, async (req: any, res) => {
+    try {
+      const commentId = req.params.id;
+      const comment = (await db.select().from(profileComments).where(eq(profileComments.id, commentId)).limit(1))[0];
+      if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+      let likesList: string[] = [];
+      if (comment.likes && Array.isArray(comment.likes)) {
+        likesList = comment.likes as string[];
+      } else if (typeof comment.likes === 'string') {
+        try {
+          likesList = JSON.parse(comment.likes);
+        } catch (e) {}
+      }
+
+      const index = likesList.indexOf(req.userId);
+      if (index > -1) {
+        likesList.splice(index, 1);
+      } else {
+        likesList.push(req.userId);
+        
+        // Notify author about the like
+        const liker = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+        if (liker && comment.authorId !== req.userId) {
+          await db.insert(notifications).values({
+            id: uuidv4(),
+            userId: comment.authorId,
+            message: `${liker.name} ${liker.surname} оценил(а) ваш отзыв в гостевой книге.`,
+            type: 'success',
+            read: false,
+            link: `/profile/${comment.profileId}`,
+            createdAt: new Date()
+          });
+        }
+      }
+
+      await db.update(profileComments).set({ likes: likesList }).where(eq(profileComments.id, commentId));
+      res.json({ success: true, likes: likesList });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error liking comment' });
+    }
+  });
+
+  app.post('/api/comments/:id/reply', authenticate, async (req: any, res) => {
+    try {
+      const commentId = req.params.id;
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: 'Ответ не может быть пустым' });
+      }
+
+      const comment = (await db.select().from(profileComments).where(eq(profileComments.id, commentId)).limit(1))[0];
+      if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+      const poster = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!poster) return res.status(404).json({ error: 'User not found' });
+
+      let repliesList: any[] = [];
+      if (comment.replies && Array.isArray(comment.replies)) {
+        repliesList = comment.replies as any[];
+      } else if (typeof comment.replies === 'string') {
+        try {
+          repliesList = JSON.parse(comment.replies);
+        } catch (e) {}
+      }
+
+      const newReply = {
+        id: uuidv4(),
+        authorId: req.userId,
+        authorName: `${poster.name} ${poster.surname}`,
+        authorAvatar: poster.avatar,
+        content: content.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      repliesList.push(newReply);
+
+      await db.update(profileComments).set({ replies: repliesList }).where(eq(profileComments.id, commentId));
+      
+      if (comment.authorId !== req.userId) {
+        await db.insert(notifications).values({
+          id: uuidv4(),
+          userId: comment.authorId,
+          message: `${poster.name} ${poster.surname} ответил(а) на ваш отзыв в гостевой книге.`,
+          type: 'new_message',
+          read: false,
+          link: `/profile/${comment.profileId}`,
+          createdAt: new Date()
+        });
+      }
+
+      res.json({ success: true, replies: repliesList });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error replying to comment' });
     }
   });
 

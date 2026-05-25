@@ -120,7 +120,12 @@ export async function initDb() {
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`,
       `ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS feedback TEXT`,
       `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS likes JSONB`,
-      `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS replies JSONB`
+      `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS replies JSONB`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW()`,
+      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_url TEXT`,
+      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachment_name TEXT`
     ];
     for (const query of alterHomeworks) {
       try {

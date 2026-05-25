@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import bcrypt from 'bcryptjs';
@@ -105,12 +106,28 @@ async function startServer() {
   }
 
   // --- Auth Middleware ---
-  const authenticate = (req: any, res: any, next: any) => {
+  const authenticate = async (req: any, res: any, next: any) => {
     const token = req.cookies.token;
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       req.userId = decoded.userId;
+
+      // Check user existence, ban status, and update presence
+      const u = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (u) {
+        if (u.isBanned && req.path !== '/api/auth/me' && req.path !== '/api/auth/logout') {
+          return res.status(403).json({ error: 'Ваш профиль заблокирован', isBanned: true });
+        }
+        
+        // Update presence every 10 seconds
+        const now = new Date();
+        const lastActive = u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0;
+        if (now.getTime() - lastActive > 10000) {
+          await db.update(users).set({ lastActiveAt: now }).where(eq(users.id, req.userId));
+        }
+      }
+
       next();
     } catch (err) {
       res.status(401).json({ error: 'Invalid token' });
@@ -139,6 +156,15 @@ async function startServer() {
     emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
 
     try {
+      const existing = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+      if (existing) {
+        await db.update(users).set({ verificationCode: code }).where(eq(users.id, existing.id));
+      }
+    } catch (dbErr) {
+      console.error('Error saving verification code to DB:', dbErr);
+    }
+
+    try {
       const isReal = await sendEmail(email, 'Код подтверждения', `Ваш код: <b>${code}</b>`);
       if (isReal) {
         res.json({ message: 'Код отправлен' });
@@ -160,6 +186,12 @@ async function startServer() {
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
+
+    try {
+      await db.update(users).set({ verificationCode: code }).where(eq(users.id, user.id));
+    } catch (dbErr) {
+      console.error('Error saving forgot code to DB:', dbErr);
+    }
 
     try {
       const isReal = await sendEmail(email, 'Сброс пароля', `Ваш код для сброса пароля: <b>${code}</b>`);
@@ -217,6 +249,7 @@ async function startServer() {
       email,
       password: hashedPassword,
       role,
+      verificationCode: code,
       createdAt: new Date(),
     });
 
@@ -623,7 +656,27 @@ async function startServer() {
         // Students only see published courses
         allCourses = await db.select().from(courses).where(eq(courses.status, 'published'));
     }
-    res.json(allCourses);
+
+    const result = [];
+    for (const c of allCourses) {
+      const author = (await db.select().from(users).where(eq(users.id, c.authorId)).limit(1))[0];
+      const authorObj = author ? {
+        id: author.id,
+        name: author.name,
+        surname: author.surname,
+        avatar: author.avatar
+      } : {
+        id: c.authorId,
+        name: 'Преподаватель',
+        surname: '',
+        avatar: null
+      };
+      result.push({
+        ...c,
+        author: authorObj
+      });
+    }
+    res.json(result);
   });
 
   app.post('/api/courses', authenticate, async (req: any, res) => {
@@ -685,6 +738,19 @@ async function startServer() {
     const course = (await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1))[0];
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
+    const author = (await db.select().from(users).where(eq(users.id, course.authorId)).limit(1))[0];
+    const authorObj = author ? {
+      id: author.id,
+      name: author.name,
+      surname: author.surname,
+      avatar: author.avatar
+    } : {
+      id: course.authorId,
+      name: 'Преподаватель',
+      surname: '',
+      avatar: null
+    };
+
     const blocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.id)).orderBy(asc(courseBlocks.order));
     
     // Fetch homeworks for blocks
@@ -694,7 +760,7 @@ async function startServer() {
         blocksWithHomework.push({ ...block, homeworks: blockHomeworks });
     }
 
-    res.json({ ...course, blocks: blocksWithHomework });
+    res.json({ ...course, author: authorObj, blocks: blocksWithHomework });
   });
 
   app.post('/api/courses/:id/blocks', authenticate, async (req: any, res) => {
@@ -791,6 +857,32 @@ async function startServer() {
     }
   });
 
+  app.post('/api/users/:id/ban', authenticate, async (req: any, res) => {
+    try {
+      const requester = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!requester || !['admin', 'curator', 'teacher'].includes(requester.role || '')) {
+         return res.status(403).json({ error: 'Доступ ограничен. Только кураторы, преподаватели и администраторы могут блокировать пользователей.' });
+      }
+
+      if (req.params.id === req.userId) {
+         return res.status(400).json({ error: 'Вы не можете заблокировать самого себя' });
+      }
+
+      const target = (await db.select().from(users).where(eq(users.id, req.params.id)).limit(1))[0];
+      if (!target) {
+         return res.status(404).json({ error: 'Пользователь не найден' });
+      }
+
+      const newBanStatus = !target.isBanned;
+      await db.update(users).set({ isBanned: newBanStatus }).where(eq(users.id, req.params.id));
+
+      res.json({ message: 'Success', isBanned: newBanStatus });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Ошибка сервера при блокировке' });
+    }
+  });
+
   // --- Messaging ---
   app.get('/api/messages-contacts', authenticate, async (req: any, res) => {
     try {
@@ -853,9 +945,17 @@ async function startServer() {
   });
 
   app.post('/api/messages', authenticate, async (req: any, res) => {
-    const { receiverId, content } = req.body;
+    const { receiverId, content, attachmentUrl, attachmentName } = req.body;
     const id = uuidv4();
-    await db.insert(messages).values({ id, senderId: req.userId, receiverId, content, createdAt: new Date() });
+    await db.insert(messages).values({ 
+      id, 
+      senderId: req.userId, 
+      receiverId, 
+      content, 
+      attachmentUrl: attachmentUrl || null,
+      attachmentName: attachmentName || null,
+      createdAt: new Date() 
+    });
     res.json({ id });
   });
 
@@ -1108,6 +1208,40 @@ async function startServer() {
     const user = (await db.select().from(users).where(eq(users.id, cert.userId)).limit(1))[0];
     res.json({ cert, user: user ? { name: user.name, surname: user.surname } : null });
   });
+
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  app.post('/api/upload', authenticate, async (req: any, res) => {
+    try {
+      const { fileName, fileType, base64Data } = req.body;
+      if (!fileName || !base64Data) {
+        return res.status(400).json({ error: 'Missing fileName or base64Data' });
+      }
+
+      // Convert base64 back to binary buffer
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      // Clean filename
+      const safeName = `${Date.now()}_${path.basename(fileName).replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+      const filePath = path.join(uploadsDir, safeName);
+      
+      // Write file to disk
+      fs.writeFileSync(filePath, buffer);
+      
+      const fileUrl = `/uploads/${safeName}`;
+      res.json({ message: 'Success', fileUrl, fileName: safeName });
+    } catch (err) {
+      console.error('Upload error:', err);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
+  });
+
+  // Serve uploads folder
+  app.use('/uploads', express.static(uploadsDir));
 
   // --- Vite ---
   if (process.env.NODE_ENV !== 'production') {

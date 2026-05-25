@@ -197,7 +197,79 @@ export default function AdminPanel() {
              />
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl">
+          {/* Mobile adaptive grid of users */}
+          <div className="block md:hidden space-y-4">
+             {filteredUsers.length === 0 ? (
+                <div className="p-10 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl italic text-zinc-500">Пользователи не найдены</div>
+             ) : filteredUsers.map(u => (
+                <div key={u.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-4 shadow-sm">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
+                         {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold">{u.name[0]}</div>}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                         <p className="font-bold text-sm truncate">{u.name} {u.surname}</p>
+                         <p className="text-xs text-zinc-500 font-mono tracking-tighter truncate">{u.email}</p>
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                      <div>
+                         <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Роль</p>
+                         <select 
+                             value={u.role}
+                             onChange={(e) => assignRole(u.id, e.target.value)}
+                             className={cn(
+                                 "w-full px-2.5 py-1.5 rounded-lg text-xs font-bold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 outline-none",
+                                 u.role === 'admin' ? "text-red-500" : u.role === 'teacher' ? "text-purple-500" : "text-zinc-500"
+                             )}
+                         >
+                             <option value="student">Студент</option>
+                             <option value="curator">Куратор</option>
+                             <option value="teacher">Учитель</option>
+                             <option value="admin">Админ</option>
+                         </select>
+                      </div>
+                      {u.role === 'student' && (
+                         <div>
+                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Куратор</p>
+                            <select 
+                                className="w-full px-2.5 py-1.5 rounded-lg text-xs font-bold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 outline-none"
+                                value={u.curatorId || ''}
+                                onChange={(e) => assignCurator(u.id, e.target.value)}
+                            >
+                                <option value="">Назначить...</option>
+                                {users.filter(cur => cur.role === 'curator').map(cur => (
+                                    <option key={cur.id} value={cur.id}>{cur.name} {cur.surname}</option>
+                                ))}
+                            </select>
+                         </div>
+                      )}
+                   </div>
+                   <div className="flex justify-end gap-2 pt-3 border-t border-zinc-150 dark:border-zinc-800">
+                      <Link 
+                          to={`/messages/${u.id}`}
+                          title="Написать сообщение"
+                          className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-indigo-500 transition-colors flex items-center gap-1.5 text-xs font-bold"
+                      >
+                          <MessageSquare size={14} />
+                          <span>Чат</span>
+                      </Link>
+                      {u.id !== user?.id && (
+                          <button 
+                              onClick={() => deleteUser(u.id)}
+                              className="px-3 py-1.5 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold"
+                          >
+                              <Trash2 size={14} />
+                              <span>Удалить</span>
+                          </button>
+                      )}
+                   </div>
+                </div>
+             ))}
+          </div>
+
+          {/* Desktop Table view of users */}
+          <div className="hidden md:block bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xl">
              <table className="w-full text-left border-collapse">
                 <thead>
                    <tr className="bg-zinc-50 dark:bg-zinc-800/50">

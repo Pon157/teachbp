@@ -57,7 +57,12 @@ export default function LandingPage() {
       if (res.ok) {
         setCodeSent(true);
         setError('');
-        setSuccess(data.message || 'Код отправлен');
+        if (data.code) {
+          setSuccess(`Код отправлен! Демо-код: ${data.code}`);
+          setFormData(prev => ({ ...prev, code: data.code }));
+        } else {
+          setSuccess(data.message || 'Код отправлен');
+        }
       } else {
         setError(data.error);
       }

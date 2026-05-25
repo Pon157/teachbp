@@ -94,7 +94,7 @@ export default function Layout() {
             <div className="flex items-center space-x-2 sm:space-x-3">
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="flex md:hidden p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="flex lg:hidden p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -107,7 +107,7 @@ export default function Layout() {
             </div>
 
             {/* Nav Links */}
-            <div className="hidden md:flex items-center space-x-2">
+            <div className="hidden lg:flex items-center space-x-2">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
@@ -159,15 +159,39 @@ export default function Layout() {
                         >
                           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
                             <h3 className="font-bold text-slate-800 dark:text-slate-100">Уведомления</h3>
-                            <button className="text-xs text-slate-400 hover:text-slate-900 dark:hover:text-white uppercase tracking-wider font-bold">Очистить</button>
+                            <button 
+                              onClick={async () => {
+                                 await fetch('/api/notifications/read-all', { method: 'POST' });
+                                 setNotifications(prev => prev.map(item => ({ ...item, read: true })));
+                              }}
+                              className="text-xs text-slate-400 hover:text-slate-900 dark:hover:text-white uppercase tracking-wider font-bold"
+                            >
+                               Очистить
+                            </button>
                           </div>
                           <div className="max-h-96 overflow-y-auto">
                             {notifications.length === 0 ? (
-                              <div className="p-8 text-center text-slate-500 text-sm italic">Нет новых уведомлений</div>
+                               <div className="p-8 text-center text-slate-500 text-sm italic">Нет новых уведомлений</div>
                             ) : (
-                              notifications.map(n => (
-                                <div key={n.id} className={cn("p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer", !n.read && "bg-indigo-50/30 dark:bg-indigo-900/10")}>
+                               notifications.map(n => (
+                                <div 
+                                  key={n.id} 
+                                  onClick={async () => {
+                                    if (!n.read) {
+                                      fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
+                                      setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+                                    }
+                                    setShowNotifications(false);
+                                    if (n.link) {
+                                      navigate(n.link);
+                                    }
+                                  }}
+                                  className={cn("p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer text-left", !n.read && "bg-indigo-50/30 dark:bg-indigo-900/10")}
+                                >
                                   <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{n.message}</p>
+                                  {n.link && (
+                                    <span className="inline-block mt-1 font-mono text-[9px] uppercase tracking-wider text-indigo-500 font-black">Перейти к уроку →</span>
+                                  )}
                                   <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">{new Date(n.createdAt).toLocaleString()}</p>
                                 </div>
                               ))
@@ -241,12 +265,12 @@ export default function Layout() {
       <AnimatePresence>
         {showMobileMenu && (
           <>
-            <div className="fixed inset-0 top-16 bg-slate-950/20 dark:bg-slate-950/50 backdrop-blur-sm z-30 md:hidden animate-fade-in" onClick={() => setShowMobileMenu(false)} />
+            <div className="fixed inset-0 top-16 bg-slate-950/20 dark:bg-slate-950/50 backdrop-blur-sm z-30 lg:hidden animate-fade-in" onClick={() => setShowMobileMenu(false)} />
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="absolute top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xl z-40 md:hidden overflow-hidden transition-colors"
+              className="absolute top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xl z-40 lg:hidden overflow-hidden transition-colors"
             >
               <div className="p-4 space-y-2">
                 {navItems.map((item) => (

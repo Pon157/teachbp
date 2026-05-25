@@ -81,7 +81,7 @@ export default function VerifyCertificate() {
         className="max-w-xl w-full"
       >
         <div className="flex justify-center mb-12 no-print">
-            <div className="w-12 h-12 bg-slate-900 dark:bg-zinc-100 rounded-xl flex items-center justify-center text-white dark:text-black font-bold text-2xl shadow-md">B</div>
+            <div className="w-12 h-12 bg-slate-900 dark:bg-zinc-100 rounded-xl flex items-center justify-center text-white dark:text-black font-bold text-2xl shadow-md">Э</div>
         </div>
 
         <div id="certificate-print-area" className="bg-white dark:bg-zinc-900 rounded-[3rem] border border-slate-200 dark:border-zinc-800 p-8 md:p-12 shadow-2xl relative overflow-hidden print:text-black">
@@ -96,7 +96,7 @@ export default function VerifyCertificate() {
 
                 <div className="space-y-4">
                     <h1 className="text-4xl md:text-5xl font-bold tracking-tighter leading-tight text-slate-900 dark:text-white print:text-black">Подтверждение Квалификации</h1>
-                    <p className="text-slate-500 dark:text-zinc-400 leading-relaxed font-medium print:text-zinc-650">Этот документ подтверждает успешное прохождение образовательных блоков на платформе BotSupport.</p>
+                    <p className="text-slate-500 dark:text-zinc-400 leading-relaxed font-medium print:text-zinc-650">Этот документ подтверждает успешное прохождение образовательных блоков на платформе Эмппати курс.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-8 py-8 border-y border-slate-150 dark:border-zinc-800 print:border-zinc-300">
@@ -114,7 +114,7 @@ export default function VerifyCertificate() {
                     </div>
                     <div className="space-y-1 text-right">
                         <p className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase font-bold tracking-widest print:text-zinc-650">Лицензия</p>
-                        <p className="font-bold text-sm text-emerald-600 dark:text-emerald-500 print:text-emerald-700">BS-PRO-2026</p>
+                        <p className="font-bold text-sm text-emerald-600 dark:text-emerald-500 print:text-emerald-700">EMP-PRO-2026</p>
                     </div>
                 </div>
 
@@ -139,7 +139,7 @@ export default function VerifyCertificate() {
         </div>
 
         <p className="mt-12 text-center text-slate-400 dark:text-zinc-600 text-xs uppercase tracking-widest font-bold no-print">
-            BotSupport Mastery Education Center
+            Образовательная платформа Эмппати курс
         </p>
       </motion.div>
     </div>

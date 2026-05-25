@@ -87,5 +87,7 @@ export const profileComments = pgTable('profile_comments', {
   authorName: text('author_name').notNull(),
   authorAvatar: text('author_avatar'),
   content: text('content').notNull(),
+  likes: jsonb('likes'), // JSON array of user IDs who liked: e.g. ["userId1", "userId2"]
+  replies: jsonb('replies'), // JSON array of replies: [{ id, authorId, authorName, authorAvatar, content, createdAt }]
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

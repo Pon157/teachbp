@@ -10,8 +10,7 @@ import {
   MessageSquare,
   CheckCircle2,
   ChevronRight as ChevronRightIcon,
-  RefreshCcw,
-  ShieldAlert
+  RefreshCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Message, User } from '../types';

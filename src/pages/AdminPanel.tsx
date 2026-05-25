@@ -292,7 +292,7 @@ export default function AdminPanel() {
                                   "px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold",
                                   u.isBanned 
                                       ? "bg-rose-500 text-white hover:bg-rose-600" 
-                                      : "bg-amber-100 hover:bg-rose-50 text-amber-850 hover:text-rose-600 dark:bg-zinc-800 dark:text-amber-300 dark:hover:bg-rose-950/20"
+                                      : "bg-amber-100 hover:bg-rose-50 text-amber-800 hover:text-rose-600 dark:bg-zinc-800 dark:text-amber-300 dark:hover:bg-rose-950/20"
                               )}
                           >
                               <ShieldAlert size={14} />

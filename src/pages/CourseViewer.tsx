@@ -94,13 +94,26 @@ export default function CourseViewer() {
       if (currentBlockIndex < course!.blocks.length - 1) {
         setCurrentBlockIndex(currentBlockIndex + 1);
       } else {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#f97316', '#ffffff', '#000000']
+        const hasPendingHomework = course!.blocks.some(b => {
+          const prog = progressList.find((p: any) => p.blockId === b.id);
+          const hasHomework = b.homeworks && b.homeworks.length > 0;
+          if (b.id === block.id) {
+            return hasHomework;
+          }
+          return hasHomework && (!prog || prog.grade !== 'accepted');
         });
-        alert('Поздравляем! Вы прошли весь курс!');
+
+        if (hasPendingHomework) {
+          alert('Поздравляем! Вы изучили все темы курса. Курс будет отмечен как пройденный, когда куратор проверит и примет все ваши домашние задания.');
+        } else {
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#f97316', '#ffffff', '#000000']
+          });
+          alert('Поздравляем! Вы успешно прошли весь курс!');
+        }
       }
     } finally {
       setSubmitting(false);
@@ -199,15 +212,15 @@ export default function CourseViewer() {
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight leading-tight text-slate-900 dark:text-slate-100 break-words">{currentBlock?.title}</h1>
             <div className="flex items-center space-x-6">
               {author && (
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm">
+                <Link to={`/profile/${author.id}`} className="flex items-center space-x-4 hover:opacity-90 group transition-all">
+                  <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm group-hover:border-indigo-500 transition-colors">
                     {author.avatar ? <img src={author.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-extrabold text-lg bg-indigo-50 text-indigo-600">{author.name[0]}</div>}
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-widest mb-0.5">Преподаватель</p>
-                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 underline decoration-indigo-200 decoration-2 underline-offset-4">{author.name} {author.surname}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 underline decoration-indigo-200 decoration-2 underline-offset-4 group-hover:text-indigo-600 transition-colors">{author.name} {author.surname}</p>
                   </div>
-                </div>
+                </Link>
               )}
               <div className="w-px h-8 bg-slate-200 dark:bg-slate-800" />
               <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-tighter">

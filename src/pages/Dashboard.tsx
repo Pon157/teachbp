@@ -188,7 +188,7 @@ export default function Dashboard() {
             <div className="max-w-md relative z-10">
               <div className="text-indigo-400 font-bold uppercase tracking-[0.3em] text-[10px] mb-4">Ваша цель</div>
               <h2 className="text-4xl font-extrabold mb-6 tracking-tight">Подтвердите свою компетенцию</h2>
-              <p className="text-slate-400 mb-10 leading-relaxed text-lg font-medium">После успешного завершения всех модулей вы получите персональный верифицируемый сертификат от BotSupport.Edu.</p>
+              <p className="text-slate-400 mb-10 leading-relaxed text-lg font-medium">После успешного завершения всех модулей вы получите персональный верифицируемый сертификат от Эмппати курс.</p>
               <button 
                 onClick={generateCert}
                 disabled={generatingCert || stats.completedCourses === 0}

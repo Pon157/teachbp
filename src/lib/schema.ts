@@ -48,7 +48,7 @@ export const userProgress = pgTable('user_progress', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   blockId: text('block_id').notNull().references(() => courseBlocks.id, { onDelete: 'cascade' }),
-  status: text('status').$type<'unlocked' | 'completed'>().default('unlocked'),
+  status: text('status').$type<'unlocked' | 'completed' | 'submitted'>().default('unlocked'),
   homeworkResponse: jsonb('homework_response'), // Record<taskId, value>
   grade: text('grade'), // 'accepted', 'rejected', 'needs_revision', null
   feedback: text('feedback'), // Curator feedback
@@ -61,6 +61,7 @@ export const notifications = pgTable('notifications', {
   message: text('message').notNull(),
   type: text('type').notNull(), // 'course_pass', 'new_message', 'new_block', 'curator_assigned'
   read: boolean('read').default(false),
+  link: text('link'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

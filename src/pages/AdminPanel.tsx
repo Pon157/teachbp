@@ -12,7 +12,8 @@ import {
   UserCheck,
   BookOpen,
   Trash2,
-  MessageSquare
+  MessageSquare,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -69,6 +70,28 @@ export default function AdminPanel() {
     } catch (err) {
         console.error(err);
         alert('Сетевая ошибка');
+    }
+  };
+
+  const toggleBanUser = async (userId: string, isBanned: boolean) => {
+    if (userId === user?.id) {
+      alert("Вы не можете заблокировать самого себя");
+      return;
+    }
+    const actionText = isBanned ? 'разблокировать' : 'заблокировать';
+    if (!confirm(`Вы уверены, что хотите ${actionText} этого пользователя?`)) return;
+    try {
+      const res = await fetch(`/api/users/${userId}/ban`, { method: 'POST' });
+      if (res.ok) {
+        await fetchData();
+        alert(isBanned ? 'Пользователь успешно разблокирован' : 'Пользователь успешно заблокирован');
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Ошибка при изменении статуса блокировки');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Сетевая ошибка');
     }
   };
 
@@ -208,7 +231,14 @@ export default function AdminPanel() {
                          {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold">{u.name[0]}</div>}
                       </div>
                       <div className="min-w-0 flex-1">
-                         <p className="font-bold text-sm truncate">{u.name} {u.surname}</p>
+                         <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm truncate">{u.name} {u.surname}</p>
+                            {u.isBanned && (
+                              <span className="bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-rose-500/20 shrink-0">
+                                 Блок
+                              </span>
+                            )}
+                         </div>
                          <p className="text-xs text-zinc-500 font-mono tracking-tighter truncate">{u.email}</p>
                       </div>
                    </div>
@@ -256,6 +286,21 @@ export default function AdminPanel() {
                       </Link>
                       {u.id !== user?.id && (
                           <button 
+                              type="button"
+                              onClick={() => toggleBanUser(u.id, !!u.isBanned)}
+                              className={cn(
+                                  "px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold",
+                                  u.isBanned 
+                                      ? "bg-rose-500 text-white hover:bg-rose-600" 
+                                      : "bg-amber-100 hover:bg-rose-50 text-amber-850 hover:text-rose-600 dark:bg-zinc-800 dark:text-amber-300 dark:hover:bg-rose-950/20"
+                              )}
+                          >
+                              <ShieldAlert size={14} />
+                              <span>{u.isBanned ? 'Разблокировать' : 'Бан'}</span>
+                          </button>
+                      )}
+                      {u.id !== user?.id && (
+                          <button 
                               onClick={() => deleteUser(u.id)}
                               className="px-3 py-1.5 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 rounded-lg text-red-500 transition-colors flex items-center gap-1.5 text-xs font-bold"
                           >
@@ -288,7 +333,14 @@ export default function AdminPanel() {
                                   {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold">{u.name[0]}</div>}
                                </div>
                                <div>
-                                  <p className="font-bold text-sm">{u.name} {u.surname}</p>
+                                  <div className="flex items-center gap-2">
+                                     <p className="font-bold text-sm">{u.name} {u.surname}</p>
+                                     {u.isBanned && (
+                                       <span className="bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border border-rose-500/20 shrink-0">
+                                          Блок
+                                       </span>
+                                     )}
+                                  </div>
                                   <p className="text-xs text-zinc-500 font-mono tracking-tighter">{u.email}</p>
                                </div>
                             </div>
@@ -331,6 +383,21 @@ export default function AdminPanel() {
                                 >
                                     <MessageSquare size={18} />
                                 </Link>
+                                {u.id !== user?.id && (
+                                    <button 
+                                        type="button"
+                                        onClick={() => toggleBanUser(u.id, !!u.isBanned)}
+                                        title={u.isBanned ? "Разблокировать пользователя" : "Заблокировать пользователя"}
+                                        className={cn(
+                                          "p-2 rounded-lg transition-colors",
+                                          u.isBanned 
+                                            ? "text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/25 animate-pulse" 
+                                            : "text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                        )}
+                                    >
+                                        <ShieldAlert size={18} />
+                                    </button>
+                                )}
                                 {u.id !== user?.id && (
                                     <button 
                                         onClick={() => deleteUser(u.id)}

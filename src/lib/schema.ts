@@ -13,6 +13,9 @@ export const users = pgTable('users', {
   theme: text('theme').default('light'),
   language: text('language').default('ru'),
   stats: jsonb('stats'), // { completedCourses: number, totalArticles: number, rank: string }
+  verificationCode: text('verification_code'),
+  isBanned: boolean('is_banned').default(false),
+  lastActiveAt: timestamp('last_active_at', { withTimezone: true }).defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -70,6 +73,8 @@ export const messages = pgTable('messages', {
   senderId: text('sender_id').notNull().references(() => users.id),
   receiverId: text('receiver_id').notNull().references(() => users.id),
   content: text('content').notNull(),
+  attachmentUrl: text('attachment_url'),
+  attachmentName: text('attachment_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -40,24 +40,6 @@ export default function MessagesPage() {
     return Date.now() - activeTime < 35000;
   };
 
-  const handleToggleBan = async () => {
-    if (!targetUser) return;
-    try {
-      const res = await fetch(`/api/users/${targetUser.id}/ban`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setTargetUser(prev => prev ? { ...prev, isBanned: !!data.isBanned } : null);
-        alert(data.isBanned ? 'Пользователь успешно заблокирован в системе.' : 'Пользователь успешно разблокирован.');
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Ошибка при блокировке');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Ошибка связи с сервером');
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -403,21 +385,6 @@ export default function MessagesPage() {
                         </Link>
                     </div>
                     <div className="flex items-center space-x-3">
-                        {['admin', 'curator', 'teacher'].includes(user?.role || '') && (
-                          <button 
-                            type="button"
-                            onClick={handleToggleBan}
-                            className={cn(
-                              "px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95",
-                              targetUser.isBanned 
-                                ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-100" 
-                                : "bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/20 dark:text-slate-200"
-                            )}
-                          >
-                            <ShieldAlert size={14} />
-                            <span>{targetUser.isBanned ? 'Разблокировать' : 'Заблокировать'}</span>
-                          </button>
-                        )}
                     </div>
                 </div>
 

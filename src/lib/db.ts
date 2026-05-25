@@ -114,6 +114,7 @@ export async function initDb() {
 
     // Database schema migrations
     const alterHomeworks = [
+      `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'open'`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS options JSONB`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`,

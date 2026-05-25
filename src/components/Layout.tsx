@@ -100,9 +100,9 @@ export default function Layout() {
               </button>
               <Link to="/dashboard" className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
-                  <span className="text-white font-bold text-xl">B</span>
+                  <span className="text-white font-bold text-xl">Э</span>
                 </div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100 hidden sm:block">BotSupport.Edu</h1>
+                <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100 hidden sm:block">Эмппати курс</h1>
               </Link>
             </div>
 

@@ -50,7 +50,7 @@ async function startServer() {
     },
   });
 
-  const sendEmail = async (to: string, subject: string, html: string) => {
+  const sendEmail = async (to: string, subject: string, html: string): Promise<boolean> => {
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
         await transporter.sendMail({
@@ -60,7 +60,7 @@ async function startServer() {
           html,
         });
         console.log(`[EMAIL SUCCESS] Real message dispatched to ${to}`);
-        return;
+        return true;
       } catch (err) {
         console.error(`[EMAIL ERROR] SMTP dispatch failed to ${to}:`, err);
       }
@@ -70,7 +70,39 @@ async function startServer() {
     const codeMatch = html.match(/<b>(\d+)<\/b>/);
     if (codeMatch) console.log(`[CODE]: ${codeMatch[1]}`);
     console.log('------------------------------------------');
+    return false;
   };
+
+  async function ensureStudentHasCurator(userId: string) {
+    try {
+      const student = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+      if (student && student.role === 'student' && !student.curatorId) {
+        const allCurators = await db.select().from(users).where(eq(users.role, 'curator'));
+        if (allCurators.length > 0) {
+          const allWards = await db.select().from(users).where(eq(users.role, 'student'));
+          const counts = allCurators.map(cur => {
+            const count = allWards.filter(w => w.curatorId === cur.id).length;
+            return { id: cur.id, count };
+          });
+          counts.sort((a, b) => a.count - b.count);
+          const chosenCurator = counts[0].id;
+          await db.update(users).set({ curatorId: chosenCurator }).where(eq(users.id, userId));
+          
+          await db.insert(notifications).values({
+            id: uuidv4(),
+            userId,
+            message: `Вам назначен куратор! Теперь вы можете общаться в чате поддержки.`,
+            type: 'info',
+            read: false,
+            createdAt: new Date()
+          });
+          console.log(`[CURATOR AUTO-ASSIGNED] Curator ${chosenCurator} allocated for Student ${userId}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error auto-assigning curator:', err);
+    }
+  }
 
   // --- Auth Middleware ---
   const authenticate = (req: any, res: any, next: any) => {
@@ -107,11 +139,58 @@ async function startServer() {
     emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
 
     try {
-      await sendEmail(email, 'Код подтверждения', `Ваш код: <b>${code}</b>`);
-      res.json({ message: 'Код отправлен' });
+      const isReal = await sendEmail(email, 'Код подтверждения', `Ваш код: <b>${code}</b>`);
+      if (isReal) {
+        res.json({ message: 'Код отправлен' });
+      } else {
+        res.json({ message: 'Код отправлен (Используйте демо-код)', code });
+      }
     } catch (err) {
       res.status(500).json({ error: 'Ошибка почты' });
     }
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    let { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    email = email.toLowerCase().trim();
+
+    const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+    if (!user) return res.status(404).json({ error: 'Пользователь с таким email не найден' });
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    emailCodes.set(email, { code, expires: Date.now() + 10 * 60 * 1000 });
+
+    try {
+      const isReal = await sendEmail(email, 'Сброс пароля', `Ваш код для сброса пароля: <b>${code}</b>`);
+      if (isReal) {
+        res.json({ message: 'Код отправлен' });
+      } else {
+        res.json({ message: 'Код отправлен (Используйте демо-код)', code });
+      }
+    } catch (err) {
+      res.status(500).json({ error: 'Ошибка почты' });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    let { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) return res.status(400).json({ error: 'Все поля обязательны' });
+    email = email.toLowerCase().trim();
+
+    const stored = emailCodes.get(email);
+    if (!stored || stored.code !== code || stored.expires < Date.now()) {
+      return res.status(400).json({ error: 'Неверный или просроченный код' });
+    }
+
+    const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
+    emailCodes.delete(email);
+
+    res.json({ message: 'Success' });
   });
 
   // --- Auth Routes ---
@@ -141,6 +220,8 @@ async function startServer() {
       createdAt: new Date(),
     });
 
+    await ensureStudentHasCurator(userId);
+
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, { httpOnly: true, maxAge: 7*24*60*60*1000, path: '/' });
     res.json({ message: 'Success' });
@@ -151,6 +232,9 @@ async function startServer() {
     email = email.toLowerCase().trim();
     const user = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
     if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ error: 'Неверный логин/пароль' });
+    
+    await ensureStudentHasCurator(user.id);
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, { httpOnly: true, maxAge: 7*24*60*60*1000, path: '/' });
     res.json({ message: 'Success' });
@@ -601,6 +685,12 @@ async function startServer() {
 
   app.post('/api/progress/complete-block', authenticate, async (req: any, res) => {
     const { blockId, homeworkResponse } = req.body;
+
+    // Check if block has any homework tasks
+    const blockTasks = await db.select().from(homeworks).where(eq(homeworks.blockId, blockId));
+    const hasHomework = blockTasks.length > 0;
+    const initialStatus = hasHomework ? 'submitted' : 'completed';
+
     const existing = (await db.select().from(userProgress).where(
         and(eq(userProgress.userId, req.userId), eq(userProgress.blockId, blockId))
     ).limit(1))[0];
@@ -608,7 +698,7 @@ async function startServer() {
     if (existing) {
         await db.update(userProgress).set({
             homeworkResponse,
-            status: 'completed',
+            status: initialStatus,
             grade: null,
             updatedAt: new Date()
         }).where(eq(userProgress.id, existing.id));
@@ -618,12 +708,12 @@ async function startServer() {
             userId: req.userId,
             blockId,
             homeworkResponse,
-            status: 'completed',
+            status: initialStatus,
             grade: null,
             updatedAt: new Date()
         });
     }
-    res.json({ message: 'Success' });
+    res.json({ message: 'Success', status: initialStatus });
   });
 
   // --- Curator Endpoints ---
@@ -708,6 +798,7 @@ async function startServer() {
       await db.update(userProgress).set({
         grade,
         feedback,
+        status: grade === 'accepted' ? 'completed' : 'submitted',
         updatedAt: new Date()
       }).where(eq(userProgress.id, req.params.id));
 

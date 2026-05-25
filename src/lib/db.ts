@@ -78,6 +78,7 @@ export async function initDb() {
       message TEXT NOT NULL,
       type TEXT NOT NULL,
       read BOOLEAN DEFAULT FALSE,
+      link TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS messages (

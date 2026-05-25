@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Send, 
   Search, 
@@ -27,6 +27,37 @@ export default function MessagesPage() {
   const [targetUser, setTargetUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searching, setSearching] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/users?search=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const delayDebounceFn = setTimeout(() => {
+      performSearch();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   // In a real app we'd fetch contacts. Here we just fetch the curator or a target
   useEffect(() => {
@@ -101,31 +132,62 @@ export default function MessagesPage() {
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Поиск диалогов..."
-                className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-3.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                placeholder="Поиск пользователей..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-805 border-none rounded-2xl pl-12 pr-4 py-3.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 transition-all placeholder-slate-400"
               />
            </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {targetUser ? (
-                <div className="flex items-center space-x-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-transparent">
+            {searchQuery.trim() !== '' ? (
+              <div className="space-y-3 text-left">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pl-2">Найденные пользователи</p>
+                {searching ? (
+                  <div className="p-8 text-center text-xs font-mono text-slate-400 animate-pulse">Поиск...</div>
+                ) : searchResults.length === 0 ? (
+                  <div className="p-8 text-center text-xs font-mono text-slate-400">Пользователи не найдены</div>
+                ) : (
+                  searchResults.map((u: User) => (
+                    <div 
+                      key={u.id}
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSearchResults([]);
+                        navigate(`/messages/${u.id}`);
+                      }}
+                      className="flex items-center space-x-4 p-4 bg-slate-55/45 dark:bg-slate-900/10 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[1.5rem] cursor-pointer transition-all border border-transparent hover:border-slate-150/50"
+                    >
+                      <div className="w-11 h-11 rounded-xl bg-indigo-600 overflow-hidden shrink-0 shadow-sm relative">
+                        {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-sm text-white">{u.name[0]}</div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-xs truncate text-slate-900 dark:text-slate-100">{u.name} {u.surname}</p>
+                        <p className="text-[10px] text-slate-400 truncate font-mono">{u.email}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : targetUser ? (
+                <div onClick={() => navigate(`/messages/${targetUser.id}`)} className="flex items-center space-x-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-transparent">
                     <div className="w-14 h-14 rounded-2xl bg-indigo-600 overflow-hidden shrink-0 shadow-md">
                         {targetUser.avatar ? <img src={targetUser.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-lg text-white">{targetUser.name[0]}</div>}
                     </div>
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 overflow-hidden text-left">
                         <div className="flex justify-between items-center mb-1">
                             <span className="font-extrabold text-sm truncate text-slate-900 dark:text-slate-100">{targetUser.name} {targetUser.surname}</span>
-                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">12:45</span>
+                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Диалог</span>
                         </div>
-                        <p className="text-xs text-slate-500 truncate font-medium">{messages[messages.length-1]?.content || 'Начните диалог с куратором'}</p>
+                        <p className="text-xs text-slate-500 truncate font-medium">{messages[messages.length-1]?.content || 'Нажмите, чтобы открыть диалог'}</p>
                     </div>
                 </div>
             ) : (
                 <div className="p-10 text-center">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare size={24} className="text-slate-300" />
+                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare size={24} className="text-slate-300 dark:text-slate-600" />
                   </div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Нет активных чатов</p>
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Нет активных чатов</p>
                 </div>
             )}
         </div>

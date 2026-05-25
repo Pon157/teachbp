@@ -32,6 +32,28 @@ export default function MessagesPage() {
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
 
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
+
+  // Fetch active contacts list
+  const fetchContacts = async () => {
+    try {
+      const res = await fetch('/api/messages-contacts');
+      if (res.ok) {
+        const data = await res.json();
+        setContacts(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContacts();
+  }, [urlUserId]);
+
   useEffect(() => {
     const performSearch = async () => {
       if (!searchQuery.trim()) {
@@ -125,7 +147,10 @@ export default function MessagesPage() {
   return (
     <div className="h-full bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 overflow-hidden flex shadow-2xl shadow-slate-200 dark:shadow-none">
       {/* Sidebar - Contacts */}
-      <aside className="w-80 border-r border-slate-100 dark:border-slate-800 hidden md:flex flex-col">
+      <aside className={cn(
+        "w-full md:w-80 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0",
+        urlUserId ? "hidden md:flex" : "flex"
+      )}>
         <div className="p-8 border-b border-slate-50 dark:border-slate-800">
            <h2 className="text-xl font-black mb-6 tracking-tight text-slate-900 dark:text-slate-100">Сообщения</h2>
            <div className="relative">
@@ -135,7 +160,7 @@ export default function MessagesPage() {
                 placeholder="Поиск пользователей..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-805 border-none rounded-2xl pl-12 pr-4 py-3.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 transition-all placeholder-slate-400"
+                className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-3.5 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-100 dark:text-slate-100 transition-all placeholder-slate-400"
               />
            </div>
         </div>
@@ -161,7 +186,7 @@ export default function MessagesPage() {
                       <div className="w-11 h-11 rounded-xl bg-indigo-600 overflow-hidden shrink-0 shadow-sm relative">
                         {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-sm text-white">{u.name[0]}</div>}
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 text-left">
                         <p className="font-extrabold text-xs truncate text-slate-900 dark:text-slate-100">{u.name} {u.surname}</p>
                         <p className="text-[10px] text-slate-400 truncate font-mono">{u.email}</p>
                       </div>
@@ -169,19 +194,41 @@ export default function MessagesPage() {
                   ))
                 )}
               </div>
-            ) : targetUser ? (
-                <div onClick={() => navigate(`/messages/${targetUser.id}`)} className="flex items-center space-x-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-transparent">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-600 overflow-hidden shrink-0 shadow-md">
-                        {targetUser.avatar ? <img src={targetUser.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-lg text-white">{targetUser.name[0]}</div>}
-                    </div>
-                    <div className="flex-1 overflow-hidden text-left">
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="font-extrabold text-sm truncate text-slate-900 dark:text-slate-100">{targetUser.name} {targetUser.surname}</span>
-                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Диалог</span>
+            ) : contacts.length > 0 ? (
+              <div className="space-y-2 text-left">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pl-2 mb-1">Ваши собеседники</p>
+                {contacts.map((contact: any) => {
+                  const isActive = targetUser?.id === contact.id;
+                  return (
+                    <div 
+                      key={contact.id}
+                      onClick={() => navigate(`/messages/${contact.id}`)}
+                      className={cn(
+                        "flex items-center space-x-4 p-4 rounded-[1.5rem] cursor-pointer transition-all border text-left",
+                        isActive 
+                          ? "bg-slate-100 dark:bg-slate-800 border-transparent shadow-sm" 
+                          : "bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/10"
+                      )}
+                    >
+                      <div className="w-11 h-11 rounded-xl bg-indigo-600 overflow-hidden shrink-0 shadow-xs relative">
+                        {contact.avatar ? <img src={contact.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-sm text-white">{contact.name[0]}</div>}
+                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-white dark:border-slate-950 rounded-full" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <span className="font-extrabold text-xs truncate text-slate-900 dark:text-slate-100">{contact.name} {contact.surname}</span>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase shrink-0">
+                            {contact.id === user?.curatorId ? 'Куратор' : 'Диалог'}
+                          </span>
                         </div>
-                        <p className="text-xs text-slate-500 truncate font-medium">{messages[messages.length-1]?.content || 'Нажмите, чтобы открыть диалог'}</p>
+                        <p className="text-[11px] text-slate-500 truncate font-medium">
+                          {contact.lastMessage?.content || 'Нажмите, чтобы открыть диалог'}
+                        </p>
+                      </div>
                     </div>
-                </div>
+                  );
+                })}
+              </div>
             ) : (
                 <div className="p-10 text-center">
                   <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -194,7 +241,10 @@ export default function MessagesPage() {
       </aside>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-950/20">
+      <main className={cn(
+        "flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-950/20",
+        urlUserId ? "flex" : "hidden md:flex"
+      )}>
         {targetUser ? (
             <>
                 {/* Chat Header */}

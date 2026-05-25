@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { 
   User as UserIcon, 
@@ -20,20 +20,23 @@ import {
   Award,
   Lock,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Heart,
+  CornerDownRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function ProfilePage() {
   const { userId } = useParams<{ userId?: string }>();
   const { user: currentUser, refreshUser } = useAuth();
+  const navigate = useNavigate();
 
   // Determine if this is the logged-in user's own profile
   const isOwnProfile = !userId || userId === currentUser?.id;
 
   const [profileUser, setProfileUser] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'settings' | 'notifications'>('profile');
 
   // Edit states for own profile
   const [formData, setFormData] = useState({
@@ -51,6 +54,13 @@ export default function ProfilePage() {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+
+  // Replies & Likes Maps
+  const [replyInputMap, setReplyInputMap] = useState<Record<string, string>>({});
+  const [replySubmittingMap, setReplySubmittingMap] = useState<Record<string, boolean>>({});
+
+  // Notifications Hub
+  const [notifications, setProfileNotifications] = useState<any[]>([]);
 
   // Certificates
   const [certs, setCerts] = useState<any[]>([]);
@@ -89,6 +99,14 @@ export default function ProfilePage() {
       if (certsRes.ok) {
         const certsData = await certsRes.json();
         setCerts(certsData);
+      }
+
+      // Load own notification center list if viewing own profile
+      if (isOwnProfile) {
+        const notificationsRes = await fetch('/api/notifications');
+        if (notificationsRes.ok) {
+          setProfileNotifications(await notificationsRes.json());
+        }
       }
     } catch (err) {
       console.error('Error fetching profile data:', err);
@@ -149,6 +167,43 @@ export default function ProfilePage() {
       console.error(err);
     } finally {
       setCommentSubmitting(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    try {
+      const res = await fetch(`/api/comments/${commentId}/like`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, likes: data.likes } : c));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePostReply = async (commentId: string) => {
+    const text = replyInputMap[commentId]?.trim();
+    if (!text) return;
+
+    setReplySubmittingMap(prev => ({ ...prev, [commentId]: true }));
+    try {
+      const res = await fetch(`/api/comments/${commentId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReplyInputMap(prev => ({ ...prev, [commentId]: '' }));
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, replies: data.replies } : c));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReplySubmittingMap(prev => ({ ...prev, [commentId]: false }));
     }
   };
 
@@ -316,6 +371,22 @@ export default function ProfilePage() {
              Обзор
           </button>
           <button 
+             onClick={() => setActiveTab('notifications')}
+             className={cn(
+               "pb-4 px-6 text-xs font-black uppercase tracking-widest border-b-[3px] transition-all flex items-center gap-2",
+               activeTab === 'notifications' 
+                 ? "border-indigo-600 text-slate-900 dark:text-slate-100" 
+                 : "border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+             )}
+          >
+             <span>Уведомления</span>
+             {notifications.filter(n => !n.read).length > 0 && (
+               <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-full text-[9px] font-black animate-pulse">
+                 {notifications.filter(n => !n.read).length}
+               </span>
+             )}
+          </button>
+          <button 
              onClick={() => setActiveTab('settings')}
              className={cn(
                "pb-4 px-6 text-xs font-black uppercase tracking-widest border-b-[3px] transition-all",
@@ -331,7 +402,7 @@ export default function ProfilePage() {
 
       {/* Tab Panels */}
       <div>
-        {(!isOwnProfile || activeTab === 'profile') ? (
+        {(!isOwnProfile || activeTab === 'profile') && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
              {/* Left Column: Achievements Gallery & Certificates */}
              <div className="lg:col-span-8 space-y-8">
@@ -493,7 +564,9 @@ export default function ProfilePage() {
                 </section>
              </div>
           </div>
-        ) : (
+        )}
+
+        {isOwnProfile && activeTab === 'settings' && (
           <div className="bg-white dark:bg-slate-900 p-8 sm:p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-12">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-6">
@@ -594,6 +667,79 @@ export default function ProfilePage() {
               </div>
           </div>
         )}
+
+        {isOwnProfile && activeTab === 'notifications' && (
+          <div className="bg-white dark:bg-slate-900 p-8 sm:p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+             <div className="flex justify-between items-center pb-6 border-b border-slate-100 dark:border-slate-800 flex-wrap gap-4">
+                <h3 className="text-xl font-black text-slate-950 dark:text-slate-50 flex items-center gap-3">
+                   <Bell size={22} className="text-indigo-600" />
+                   <span>Центр Уведомлений</span>
+                </h3>
+                {notifications.length > 0 && (
+                  <button 
+                    onClick={async () => {
+                       await fetch('/api/notifications/read-all', { method: 'POST' });
+                       setProfileNotifications(prev => prev.map(item => ({ ...item, read: true })));
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 uppercase tracking-wider font-extrabold cursor-pointer"
+                  >
+                     Отметить все как прочитанные
+                  </button>
+                )}
+             </div>
+
+             <div className="space-y-4">
+                {notifications.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 dark:text-slate-500 font-mono text-xs italic">У вас пока нет уведомлений.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div 
+                      key={n.id}
+                      className={cn(
+                        "p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left",
+                        n.read 
+                          ? "bg-slate-50/20 dark:bg-slate-800/10 border-slate-200/60 dark:border-slate-800/80" 
+                          : "bg-indigo-50/15 dark:bg-indigo-950/10 border-indigo-100/40 dark:border-indigo-900/40 shadow-sm"
+                      )}
+                    >
+                      <div className="space-y-1">
+                         <p className={cn("text-sm font-extrabold", n.read ? "text-slate-500 dark:text-slate-400" : "text-slate-800 dark:text-slate-100")}>{n.message}</p>
+                         <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{new Date(n.createdAt).toLocaleString('ru-RU')}</p>
+                      </div>
+                      <div className="flex gap-2 self-end sm:self-auto shrink-0">
+                         {!n.read && (
+                           <button 
+                             onClick={async () => {
+                                await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
+                                setProfileNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+                             }}
+                             className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 rounded-lg text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+                           >
+                              Прочитано
+                           </button>
+                         )}
+                         {n.link && (
+                           <Link 
+                             to={n.link}
+                             onClick={async () => {
+                                if (!n.read) {
+                                  await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
+                                  setProfileNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item));
+                                }
+                             }}
+                             className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                           >
+                              <span>Перейти</span>
+                              <ChevronRight size={14} />
+                           </Link>
+                         )}
+                      </div>
+                    </div>
+                  ))
+                )}
+             </div>
+          </div>
+        )}
       </div>
 
       {/* Guestbook/Comments Section (Write something on the profile page) */}
@@ -647,6 +793,71 @@ export default function ProfilePage() {
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">{new Date(comment.createdAt).toLocaleString()}</p>
                   </div>
                   <p className="text-sm text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{comment.content}</p>
+
+                  {/* Action buttons + Likes */}
+                  <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                    <button
+                      onClick={() => handleLikeComment(comment.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer",
+                        (Array.isArray(comment.likes) && comment.likes.includes(currentUser?.id))
+                          ? "text-rose-500"
+                          : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      )}
+                    >
+                      <Heart size={14} className="shrink-0" fill={(Array.isArray(comment.likes) && comment.likes.includes(currentUser?.id)) ? "currentColor" : "none"} />
+                      <span>{Array.isArray(comment.likes) ? comment.likes.length : 0} Лайков</span>
+                    </button>
+                  </div>
+
+                  {/* Replies thread */}
+                  <div className="mt-4 space-y-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800">
+                    {Array.isArray(comment.replies) && comment.replies.map((reply: any) => (
+                      <div key={reply.id} className="text-left bg-slate-50/50 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-150/60 dark:border-slate-800/40">
+                         <div className="flex gap-2 items-start">
+                            <div className="w-6 h-6 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0">
+                               {reply.authorAvatar ? (
+                                 <img src={reply.authorAvatar} className="w-full h-full object-cover" />
+                               ) : (
+                                 <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                   <UserIcon size={12} />
+                                 </div>
+                               )}
+                            </div>
+                            <div className="flex-1 min-w-0 font-sans">
+                               <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                                  <p className="text-[11px] font-black text-slate-800 dark:text-slate-200">{reply.authorName}</p>
+                                  <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">{new Date(reply.createdAt).toLocaleString()}</p>
+                               </div>
+                               <p className="text-xs font-medium text-slate-600 dark:text-slate-350">{reply.content}</p>
+                            </div>
+                         </div>
+                      </div>
+                    ))}
+
+                    {/* Reply Form */}
+                    <div className="flex gap-2 items-center pt-2">
+                       <input 
+                         type="text"
+                         placeholder="Ответить в гостевой книге..."
+                         value={replyInputMap[comment.id] || ''}
+                         className="flex-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-505 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400"
+                         onChange={e => setReplyInputMap({ ...replyInputMap, [comment.id]: e.target.value })}
+                         onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              handlePostReply(comment.id);
+                            }
+                         }}
+                       />
+                       <button
+                         onClick={() => handlePostReply(comment.id)}
+                         disabled={replySubmittingMap[comment.id]}
+                         className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black uppercase text-[9px] tracking-widest rounded-lg transition-all cursor-pointer"
+                       >
+                          {replySubmittingMap[comment.id] ? <RefreshCcw size={10} className="animate-spin" /> : 'Ответ'}
+                       </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))

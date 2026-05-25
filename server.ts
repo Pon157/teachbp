@@ -860,8 +860,8 @@ async function startServer() {
   app.post('/api/users/:id/ban', authenticate, async (req: any, res) => {
     try {
       const requester = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
-      if (!requester || !['admin', 'curator', 'teacher'].includes(requester.role || '')) {
-         return res.status(403).json({ error: 'Доступ ограничен. Только кураторы, преподаватели и администраторы могут блокировать пользователей.' });
+      if (!requester || requester.role !== 'admin') {
+         return res.status(403).json({ error: 'Доступ ограничен. Только администраторы могут блокировать пользователей.' });
       }
 
       if (req.params.id === req.userId) {

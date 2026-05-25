@@ -50,6 +50,7 @@ export interface Notification {
   message: string;
   type: string;
   read: boolean;
+  link?: string;
   createdAt: string;
 }
 

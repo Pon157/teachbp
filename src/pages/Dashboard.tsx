@@ -131,8 +131,34 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="p-8">
-                    <h3 className="font-extrabold text-xl mb-3 text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{course.title}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-8 leading-relaxed font-medium">{course.description}</p>
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-extrabold text-xl text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{course.title}</h3>
+                      {stats.completedCourseIds?.includes(course.id) && (
+                        <span className="shrink-0 bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                          ✓ Пройден
+                        </span>
+                      )}
+                    </div>
+                    
+                    {course.author && (
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xs text-slate-400">Автор:</span>
+                        <Link to={`/profile/${course.author.id}`} className="inline-flex items-center gap-1.5 hover:underline decoration-indigo-400 decoration-2">
+                          <div className="w-5 h-5 rounded-full overflow-hidden bg-indigo-100 flex items-center justify-center shrink-0">
+                            {course.author.avatar ? (
+                              <img src={course.author.avatar} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-[10px] text-indigo-600 font-bold">{course.author.name[0]}</span>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            {course.author.name} {course.author.surname}
+                          </span>
+                        </Link>
+                      </div>
+                    )}
+
+                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-6 leading-relaxed font-medium">{course.description}</p>
                     <div className="flex gap-4">
                       <Link 
                         to={`/courses/${course.id}`}

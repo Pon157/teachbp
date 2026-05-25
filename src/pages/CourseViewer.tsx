@@ -230,13 +230,13 @@ export default function CourseViewer() {
           </div>
 
           {/* Homework Section */}
-          <div className="bg-slate-900 rounded-[3rem] p-10 md:p-16 text-white relative overflow-hidden shadow-2xl shadow-slate-300 dark:shadow-none">
-            <div className="absolute top-0 right-0 p-8 opacity-10">
-                <GraduationCap className="w-32 h-32" />
+          <div className="bg-white dark:bg-zinc-900 rounded-[3rem] p-10 md:p-16 text-slate-900 dark:text-white relative overflow-hidden shadow-xl border border-slate-200 dark:border-zinc-800">
+            <div className="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 pointer-events-none">
+                <GraduationCap className="w-32 h-32 text-indigo-500" />
             </div>
             
             <div className="relative z-10 space-y-12">
-              <h2 className="text-3xl font-black mb-8 flex items-center gap-4">
+              <h2 className="text-3xl font-black mb-8 flex items-center gap-4 text-slate-900 dark:text-white">
                 <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white">
                   <Send size={20} />
                 </div>
@@ -247,9 +247,9 @@ export default function CourseViewer() {
               {currentProg && (blockGrade || curatorFeedback) && (
                 <div className={cn(
                   "p-8 rounded-[2rem] border relative overflow-hidden mb-8",
-                  blockGrade === 'accepted' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-205" :
-                  blockGrade === 'needs_revision' ? "bg-amber-500/10 border-amber-500/30 text-amber-200" :
-                  "bg-rose-500/10 border-rose-500/30 text-rose-205"
+                  blockGrade === 'accepted' ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200" :
+                  blockGrade === 'needs_revision' ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200" :
+                  "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200"
                 )}>
                   <div className="flex items-center gap-3 mb-3 font-bold text-lg">
                     <span>Решение проверено куратором:</span>
@@ -265,12 +265,12 @@ export default function CourseViewer() {
                     </span>
                   </div>
                   {curatorFeedback && (
-                    <div className="bg-white/5 p-4 rounded-xl text-slate-300 italic max-w-full font-medium mt-1 leading-relaxed border border-white/5">
+                    <div className="bg-slate-100/60 dark:bg-white/5 p-4 rounded-xl text-slate-700 dark:text-slate-300 italic max-w-full font-medium mt-1 leading-relaxed border border-slate-200 dark:border-white/5">
                       "{curatorFeedback}"
                     </div>
                   )}
                   {blockGrade === 'needs_revision' && (
-                    <div className="text-amber-400 text-xs mt-3 font-black flex items-center gap-1">
+                    <div className="text-amber-600 dark:text-amber-400 text-xs mt-3 font-black flex items-center gap-1">
                       <span>Пожалуйста, исправьте указанные ошибки и отправьте решение повторно!</span>
                     </div>
                   )}
@@ -281,8 +281,8 @@ export default function CourseViewer() {
                 {currentBlock.homeworks?.map((task, idx) => (
                   <div key={task.id} className="space-y-6">
                     <div className="flex items-start gap-4">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">{idx + 1}</div>
-                        <p className="text-xl font-medium text-slate-200">{task.description}</p>
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0">{idx + 1}</div>
+                        <p className="text-xl font-semibold text-slate-800 dark:text-slate-200">{task.description}</p>
                     </div>
 
                     {task.type === 'quiz' ? (
@@ -297,12 +297,12 @@ export default function CourseViewer() {
                                  const isSelected = homeworkResponses[task.id] === opt;
                                  const isCorrect = task.correctAnswer ? opt === task.correctAnswer : true;
 
-                                 let btnClasses = "bg-white/5 border-white/10 hover:bg-white/10 text-slate-300";
+                                 let btnClasses = "bg-slate-50 hover:bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300";
                                  if (isSelected) {
                                    if (task.correctAnswer) {
                                      btnClasses = isCorrect 
-                                       ? "bg-emerald-600/30 border-emerald-500 text-emerald-200 shadow-lg"
-                                       : "bg-rose-600/30 border-rose-500 text-rose-200 shadow-lg";
+                                       ? "bg-emerald-50 dark:bg-emerald-600/30 border-emerald-400 dark:border-emerald-500 text-emerald-800 dark:text-emerald-250 shadow-md"
+                                       : "bg-rose-50 dark:bg-rose-600/30 border-rose-400 dark:border-rose-500 text-rose-800 dark:text-rose-250 shadow-md";
                                    } else {
                                      btnClasses = "bg-indigo-600 border-indigo-600 text-white shadow-lg";
                                    }
@@ -322,7 +322,7 @@ export default function CourseViewer() {
                                       {isSelected && task.correctAnswer && (
                                         <span className={cn(
                                           "text-[10px] font-black uppercase px-2 py-0.5 rounded",
-                                          isCorrect ? "bg-emerald-500/20 text-emerald-350" : "bg-rose-500/20 text-rose-350"
+                                          isCorrect ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-350" : "bg-rose-500/20 text-rose-600 dark:text-rose-350"
                                         )}>
                                           {isCorrect ? '✓ Верно' : '✗ Неверно'}
                                         </span>
@@ -333,14 +333,14 @@ export default function CourseViewer() {
                              })()}
                           </div>
                           {task.correctAnswer && homeworkResponses[task.id] && homeworkResponses[task.id] !== task.correctAnswer && (
-                            <p className="text-rose-400 text-xs font-bold leading-none">
+                            <p className="text-rose-600 dark:text-rose-400 text-xs font-bold leading-none">
                               Выбран неверный вариант ответа. Обдумайте решение и выберите другой вариант!
                             </p>
                           )}
                        </div>
                     ) : (
                         <textarea 
-                            className="w-full min-h-[150px] bg-slate-800/50 border border-slate-700 rounded-[2rem] p-8 text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-600 ml-12"
+                            className="w-full min-h-[150px] bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-[2rem] p-8 text-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-600 ml-12"
                             placeholder="Опишите свое решение здесь..."
                             value={homeworkResponses[task.id] || ''}
                             onChange={e => setHomeworkResponses({ ...homeworkResponses, [task.id]: e.target.value })}
@@ -350,19 +350,19 @@ export default function CourseViewer() {
                 ))}
 
                 {!hasTasks && (
-                  <div className="bg-white/5 border border-white/10 backdrop-blur-sm p-8 rounded-[2rem] italic text-slate-300 text-lg font-medium leading-relaxed">
+                  <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 backdrop-blur-sm p-8 rounded-[2rem] italic text-slate-600 dark:text-slate-300 text-lg font-medium leading-relaxed">
                       "Для этого урока нет специальных заданий. Просто нажмите кнопку ниже, чтобы зафиксировать прогресс."
-                      <div className="mt-4 text-sm font-bold text-indigo-400 uppercase tracking-widest">— Команда проекта</div>
+                      <div className="mt-4 text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">— Команда проекта</div>
                   </div>
                 )}
               </div>
               
-              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-10 border-t border-white/10">
-                 <button className="px-8 py-5 rounded-2xl font-extrabold text-sm text-slate-400 hover:text-white transition-colors">Сохранить черновик</button>
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-10 border-t border-slate-200 dark:border-white/10">
+                 <button className="px-8 py-5 rounded-2xl font-extrabold text-sm text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">Сохранить черновик</button>
                  <button 
                   onClick={handleCompleteBlock}
                   disabled={submitting || !allTasksAnswered}
-                  className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-sm flex items-center justify-center space-x-3 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-900 active:scale-95 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500 disabled:shadow-none"
+                  className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-black text-sm flex items-center justify-center space-x-3 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-indigo-900 active:scale-95 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 disabled:shadow-none"
                  >
                    {submitting ? <RefreshCcw className="animate-spin" /> : (
                      <>

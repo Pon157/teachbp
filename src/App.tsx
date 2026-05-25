@@ -38,7 +38,7 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode, roles?
           <div className="space-y-3">
             <h1 className="text-3xl font-black tracking-tight text-rose-500">Допуск заблокирован</h1>
             <p className="text-slate-450 text-sm font-medium leading-relaxed">
-              Ваш аккаунт на платформе <strong>BotSupport.Edu</strong> был временно заблокирован администратором или уполномоченным куратором.
+              Ваш аккаунт на платформе <strong>Эмппати курс</strong> был временно заблокирован администратором или уполномоченным куратором.
             </p>
           </div>
           <button 

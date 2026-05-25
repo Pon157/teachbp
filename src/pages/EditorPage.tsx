@@ -17,7 +17,9 @@ import {
   ArrowLeft,
   Settings,
   FileText,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -57,6 +59,54 @@ export default function EditorPage() {
   const [success, setSuccess] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string>('1');
   const [showSettings, setShowSettings] = useState(false);
+  const [showBlocksMenu, setShowBlocksMenu] = useState(false);
+
+  const renderSidebarContent = () => (
+    <div className="space-y-2">
+       <div className="flex justify-between items-center ml-4 mb-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Структура</p>
+          <button onClick={() => setShowBlocksMenu(false)} className="md:hidden p-1.5 text-slate-400 hover:text-slate-600">
+             <X size={16} />
+          </button>
+       </div>
+       {blocks.map((b, idx) => (
+         <button 
+           key={b.id}
+           onClick={() => {
+             setActiveBlockId(b.id);
+             setShowBlocksMenu(false);
+           }}
+           className={cn(
+             "w-full text-left p-4 rounded-2xl flex items-center gap-4 transition-all group",
+             activeBlockId === b.id 
+             ? "bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-100" 
+             : "text-slate-500 hover:bg-white dark:hover:bg-slate-800"
+           )}
+         >
+            <span className={cn("text-xs font-black", activeBlockId === b.id ? "text-indigo-600" : "text-slate-300")}>{idx + 1}</span>
+            <span className="text-sm font-bold truncate flex-1">{b.title || 'Новый блок'}</span>
+            {activeBlockId === b.id && blocks.length > 1 && (
+              <button 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  removeBlock(b.id); 
+                }} 
+                className="p-1 hover:text-red-500 transition-all ml-auto self-center"
+              >
+                 <Trash2 size={14} />
+              </button>
+            )}
+         </button>
+       ))}
+       <button 
+         onClick={addBlock}
+         className="w-full mt-4 py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all flex items-center justify-center gap-2"
+       >
+          <Plus size={16} />
+          Добавить блок
+       </button>
+    </div>
+  );
 
   useEffect(() => {
     if (id) {
@@ -215,83 +265,80 @@ export default function EditorPage() {
   if (fetching) return <div className="h-screen flex items-center justify-center font-black animate-pulse opacity-50">ЗАГРУЗКА РЕДАКТОРА...</div>;
 
   return (
-    <div className="fixed inset-0 bg-white dark:bg-slate-950 z-50 flex flex-col">
+    <div className="fixed inset-0 bg-white dark:bg-slate-950 z-50 flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <header className="h-20 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-8 shrink-0">
-        <div className="flex items-center gap-6">
-           <Link to="/dashboard" className="p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl transition-colors">
-              <ArrowLeft size={20} className="text-slate-400" />
+      <header className="h-20 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 shrink-0 bg-white dark:bg-slate-950">
+        <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+           <Link to="/dashboard" className="p-2 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl transition-colors">
+              <ArrowLeft size={18} className="text-slate-400" />
            </Link>
-           <div className="flex flex-col">
+           <button 
+             onClick={() => setShowBlocksMenu(!showBlocksMenu)} 
+             className="md:hidden p-2 sm:p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl text-slate-400 flex items-center justify-center shrink-0"
+             title="Открыть разделы"
+           >
+              <Menu size={18} />
+           </button>
+           <div className="flex flex-col min-w-0">
               <input 
                 type="text" 
                 value={courseTitle}
                 onChange={e => setCourseTitle(e.target.value)}
                 placeholder="Название курса..."
-                className="text-xl font-black bg-transparent border-none outline-none p-0 text-slate-900 dark:text-slate-100 placeholder:text-slate-200"
+                className="text-base sm:text-xl font-black bg-transparent border-none outline-none p-0 text-slate-900 dark:text-slate-100 placeholder:text-slate-200 truncate max-w-[120px] sm:max-w-xs md:max-w-xl"
               />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Редактирование материала</span>
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1 truncate">Редактирование</span>
            </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
            <button 
              onClick={() => setShowSettings(!showSettings)}
-             className={cn("p-4 rounded-2xl transition-all", showSettings ? "bg-indigo-50 text-indigo-600" : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900")}
+             className={cn("p-2.5 sm:p-4 rounded-2xl transition-all", showSettings ? "bg-indigo-50 text-indigo-600" : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900")}
            >
-              <Settings size={20} />
+              <Settings size={18} />
            </button>
            <button 
             onClick={saveCourse}
             disabled={loading || !courseTitle}
             className={cn(
-              "px-8 py-4 rounded-2xl font-black text-sm flex items-center space-x-3 transition-all shadow-xl disabled:opacity-50",
+              "px-4 sm:px-8 py-2.5 sm:py-4 rounded-2xl font-black text-xs sm:text-sm flex items-center space-x-2 sm:space-x-3 transition-all shadow-xl disabled:opacity-50",
               success ? "bg-emerald-500 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none"
             )}
            >
-            {loading ? <RefreshCcw size={20} className="animate-spin" /> : success ? <CheckCircle2 size={20} /> : <Send size={20} />}
-            <span>{success ? 'Готово!' : 'Сохранить всё'}</span>
+            {loading ? <RefreshCcw size={16} className="animate-spin" /> : success ? <CheckCircle2 size={16} /> : <Send size={16} />}
+            <span className="hidden xs:inline">{success ? 'Готово!' : 'Сохранить'}</span>
+            <span className="xs:hidden">{success ? '✓' : 'Сохр.'}</span>
            </button>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Navigation */}
-        <aside className="w-80 border-r border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-6 overflow-y-auto space-y-8">
-           <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-4">Структура</p>
-              {blocks.map((b, idx) => (
-                <button 
-                  key={b.id}
-                  onClick={() => setActiveBlockId(b.id)}
-                  className={cn(
-                    "w-full text-left p-4 rounded-2xl flex items-center gap-4 transition-all group",
-                    activeBlockId === b.id 
-                    ? "bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 text-slate-900 dark:text-slate-100" 
-                    : "text-slate-500 hover:bg-white dark:hover:bg-slate-800"
-                  )}
-                >
-                   <span className={cn("text-xs font-black", activeBlockId === b.id ? "text-indigo-600" : "text-slate-300")}>{idx + 1}</span>
-                   <span className="text-sm font-bold truncate flex-1">{b.title || 'Новый блок'}</span>
-                   {activeBlockId === b.id && (
-                     <button onClick={(e) => { e.stopPropagation(); removeBlock(b.id); }} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all">
-                        <Trash2 size={14} />
-                     </button>
-                   )}
-                </button>
-              ))}
-              <button 
-                onClick={addBlock}
-                className="w-full mt-4 py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all flex items-center justify-center gap-2"
-              >
-                 <Plus size={16} />
-                 Добавить блок
-              </button>
-           </div>
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left Sidebar - Navigation (Desktop only) */}
+        <aside className="w-80 border-r border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-6 overflow-y-auto space-y-8 hidden md:block select-none">
+           {renderSidebarContent()}
         </aside>
 
+        {/* Left Sidebar mobile sliding menu */}
+        <AnimatePresence>
+          {showBlocksMenu && (
+            <>
+              <div className="fixed inset-0 top-20 bg-slate-950/20 dark:bg-slate-950/50 backdrop-blur-sm z-30 md:hidden" onClick={() => setShowBlocksMenu(false)} />
+              <motion.aside
+                initial={{ x: -320 }}
+                animate={{ x: 0 }}
+                exit={{ x: -320 }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="fixed left-0 top-20 bottom-0 w-80 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 p-6 z-40 overflow-y-auto space-y-8 md:hidden shadow-2xl"
+              >
+                 {renderSidebarContent()}
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
         {/* Main Editor Console */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-12">
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-4 sm:p-8 md:p-12">
             <AnimatePresence mode="wait">
                 <motion.div 
                     key={activeBlockId}
@@ -450,7 +497,7 @@ export default function EditorPage() {
               initial={{ x: 400 }}
               animate={{ x: 0 }}
               exit={{ x: 400 }}
-              className="fixed right-0 top-20 bottom-0 w-96 bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 p-8 z-40 shadow-2xl overflow-y-auto"
+              className="fixed right-0 top-20 bottom-0 w-full sm:w-96 bg-white dark:bg-slate-900 border-l border-slate-100 dark:border-slate-800 p-6 sm:p-8 z-40 shadow-2xl overflow-y-auto"
             >
                <div className="flex items-center justify-between mb-10">
                   <h3 className="font-black text-xl">Настройки курса</h3>

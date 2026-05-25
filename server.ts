@@ -671,6 +671,26 @@ async function startServer() {
     res.json(all);
   });
 
+  app.post('/api/notifications/:id/read', authenticate, async (req: any, res) => {
+    try {
+      await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, req.params.id), eq(notifications.userId, req.userId)));
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  app.post('/api/notifications/read-all', authenticate, async (req: any, res) => {
+    try {
+      await db.update(notifications).set({ read: true }).where(eq(notifications.userId, req.userId));
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
   // --- Progress ---
   app.get('/api/progress/:courseId', authenticate, async (req: any, res) => {
     const blocks = await db.select().from(courseBlocks).where(eq(courseBlocks.courseId, req.params.courseId));
@@ -816,6 +836,7 @@ async function startServer() {
         message: `Ваше задание по теме "${blockTitle}" было проверено куратором: ${statusText}${feedback ? ` Замечания куратора: "${feedback}"` : ''}`,
         type: grade === 'accepted' ? 'success' : 'warning',
         read: false,
+        link: `/courses/${block.courseId}?blockId=${block.id}`,
         createdAt: new Date()
       });
 

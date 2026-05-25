@@ -12,6 +12,9 @@ export interface User {
   theme: 'light' | 'dark';
   language: string;
   stats?: any; // JSON object
+  isBanned?: boolean;
+  lastActiveAt?: string;
+  verificationCode?: string;
   createdAt: string;
 }
 
@@ -59,6 +62,8 @@ export interface Message {
   senderId: string;
   receiverId: string;
   content: string;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
   createdAt: string;
 }
 

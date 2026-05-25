@@ -14,7 +14,9 @@ import {
   Moon,
   Sun,
   Code2,
-  ClipboardList
+  ClipboardList,
+  Menu,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -27,6 +29,7 @@ export default function Layout() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || user?.theme || 'light');
 
   useEffect(() => {
@@ -87,13 +90,21 @@ export default function Layout() {
       <nav className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            {/* Logo */}
-            <Link to="/dashboard" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
-                <span className="text-white font-bold text-xl">B</span>
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100 hidden sm:block">BotSupport.Edu</h1>
-            </Link>
+            {/* Logo and Mobile-menu icon */}
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="flex md:hidden p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
+              </button>
+              <Link to="/dashboard" className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-200 dark:shadow-none">
+                  <span className="text-white font-bold text-xl">B</span>
+                </div>
+                <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100 hidden sm:block">BotSupport.Edu</h1>
+              </Link>
+            </div>
 
             {/* Nav Links */}
             <div className="hidden md:flex items-center space-x-2">
@@ -225,6 +236,40 @@ export default function Layout() {
           </div>
         </div>
       </nav>
+
+      {/* Mobile Menu Dropdown */}
+      <AnimatePresence>
+        {showMobileMenu && (
+          <>
+            <div className="fixed inset-0 top-16 bg-slate-950/20 dark:bg-slate-950/50 backdrop-blur-sm z-30 md:hidden animate-fade-in" onClick={() => setShowMobileMenu(false)} />
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="absolute top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xl z-40 md:hidden overflow-hidden transition-colors"
+            >
+              <div className="p-4 space-y-2">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setShowMobileMenu(false)}
+                    className={cn(
+                      "flex items-center space-x-3 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all",
+                      location.pathname.startsWith(item.path) 
+                        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300" 
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <item.icon size={18} />
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

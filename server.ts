@@ -10,7 +10,7 @@ import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
 import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks, profileComments } from './src/lib/schema.ts';
-import { eq, and, or, desc, asc } from 'drizzle-orm';
+import { eq, and, or, desc, asc, ne, ilike } from 'drizzle-orm';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
 
@@ -254,6 +254,7 @@ async function startServer() {
       const allBlocks = await db.select().from(courseBlocks);
       
       let completedCoursesCount = 0;
+      const completedCourseIds: string[] = [];
       for (const c of allCourses) {
         const courseBlocksIn = allBlocks.filter(b => b.courseId === c.id);
         if (courseBlocksIn.length > 0) {
@@ -275,6 +276,7 @@ async function startServer() {
           }
           if (courseCompleted) {
             completedCoursesCount++;
+            completedCourseIds.push(c.id);
           }
         }
       }
@@ -378,6 +380,7 @@ async function startServer() {
 
       return {
         completedCourses: completedCoursesCount,
+        completedCourseIds,
         totalArticles: completedBlocksCount,
         createdCourses: createdCoursesCount,
         xp: (completedCoursesCount * 500) + (completedBlocksCount * 50) + (createdCoursesCount * 200),
@@ -388,6 +391,7 @@ async function startServer() {
       console.error('Error calculating user stats:', err);
       return {
         completedCourses: 0,
+        completedCourseIds: [],
         totalArticles: 0,
         createdCourses: 0,
         xp: 0,
@@ -417,6 +421,33 @@ async function startServer() {
     const { name, surname, bio, avatar, theme, language } = req.body;
     await db.update(users).set({ name, surname, bio, avatar, theme, language }).where(eq(users.id, req.userId));
     res.json({ message: 'Updated' });
+  });
+
+  app.get('/api/users', authenticate, async (req: any, res) => {
+    try {
+      const search = req.query.search;
+      let allUsers = [];
+      if (search && typeof search === 'string' && search.trim() !== '') {
+        const searchTerm = `%${search.trim()}%`;
+        allUsers = await db.select().from(users).where(
+          and(
+            ne(users.id, req.userId),
+            or(
+              ilike(users.name, searchTerm),
+              ilike(users.surname, searchTerm),
+              ilike(users.email, searchTerm)
+            )
+          )
+        ).limit(50);
+      } else {
+        allUsers = await db.select().from(users).where(ne(users.id, req.userId)).limit(20);
+      }
+      const safeUsers = allUsers.map(({ password: _, ...u }) => u);
+      res.json(safeUsers);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to search users' });
+    }
   });
 
   app.get('/api/users/:id', authenticate, async (req, res) => {
@@ -761,6 +792,56 @@ async function startServer() {
   });
 
   // --- Messaging ---
+  app.get('/api/messages-contacts', authenticate, async (req: any, res) => {
+    try {
+      // Find all messages involving the current user
+      const userMsgs = await db.select().from(messages).where(
+        or(eq(messages.senderId, req.userId), eq(messages.receiverId, req.userId))
+      ).orderBy(desc(messages.createdAt));
+
+      // Extract unique user IDs of partners
+      const partnerIds: string[] = [];
+      userMsgs.forEach(m => {
+        const otherId = m.senderId === req.userId ? m.receiverId : m.senderId;
+        if (otherId && !partnerIds.includes(otherId)) {
+          partnerIds.push(otherId);
+        }
+      });
+
+      // Ensure user's curator is in the list
+      const me = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (me && me.curatorId && !partnerIds.includes(me.curatorId)) {
+        partnerIds.push(me.curatorId);
+      }
+
+      const partners = [];
+      for (const pId of partnerIds) {
+        if (pId === req.userId) continue;
+        const u = (await db.select().from(users).where(eq(users.id, pId)).limit(1))[0];
+        if (u) {
+          const { password: _, ...safeU } = u;
+          // Find the last message with this user
+          const lastMsg = userMsgs.find(m => 
+            (m.senderId === pId && m.receiverId === req.userId) || 
+            (m.senderId === req.userId && m.receiverId === pId)
+          );
+          partners.push({
+            ...safeU,
+            lastMessage: lastMsg ? {
+              content: lastMsg.content,
+              createdAt: lastMsg.createdAt
+            } : null
+          });
+        }
+      }
+
+      res.json(partners);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to fetch contacts list' });
+    }
+  });
+
   app.get('/api/messages/:otherId', authenticate, async (req: any, res) => {
     const chat = await db.select().from(messages).where(
       or(
@@ -983,11 +1064,23 @@ async function startServer() {
 
   app.post('/api/certificates', authenticate, async (req: any, res) => {
     try {
-      const { courseIds } = req.body;
-      
       const stats = await calculateUserStatsAndAchievements(req.userId);
       if (stats.completedCourses === 0) {
         return res.status(400).json({ error: 'Вы не завершили полностью ни одного курса! Пожалуйста, убедитесь, что куратор проверил и одобрил все ваши домашние задания.' });
+      }
+
+      // Automatically construct the list of completed course titles server-side
+      const completedCourseTitles: string[] = [];
+      const completedIds = stats.completedCourseIds || [];
+      for (const cId of completedIds) {
+        const c = (await db.select().from(courses).where(eq(courses.id, cId)).limit(1))[0];
+        if (c) {
+          completedCourseTitles.push(c.title);
+        }
+      }
+
+      if (completedCourseTitles.length === 0) {
+        return res.status(400).json({ error: 'У вас нет полностью завершенных курсов.' });
       }
 
       const shareId = uuidv4().substring(0, 8);
@@ -996,7 +1089,7 @@ async function startServer() {
       await db.insert(certificates).values({
         id: certId,
         userId: req.userId,
-        courseIds: JSON.stringify(courseIds || []),
+        courseIds: JSON.stringify(completedCourseTitles),
         shareId,
         createdAt: new Date()
       });

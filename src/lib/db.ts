@@ -116,7 +116,9 @@ export async function initDb() {
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'open'`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS options JSONB`,
       `ALTER TABLE homeworks ADD COLUMN IF NOT EXISTS correct_answer TEXT`,
-      `ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS feedback TEXT`
+      `ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS feedback TEXT`,
+      `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS likes JSONB`,
+      `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS replies JSONB`
     ];
     for (const query of alterHomeworks) {
       try {

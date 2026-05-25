@@ -5,15 +5,13 @@ import {
   Send, 
   Search, 
   User as UserIcon, 
-  Phone, 
-  Video, 
-  MoreVertical,
   Paperclip,
   Smile,
   MessageSquare,
   CheckCircle2,
   ChevronRight as ChevronRightIcon,
-  RefreshCcw
+  RefreshCcw,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Message, User } from '../types';
@@ -31,6 +29,40 @@ export default function MessagesPage() {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [searching, setSearching] = useState(false);
   const navigate = useNavigate();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const isOnline = (userObj: any) => {
+    if (!userObj || !userObj.lastActiveAt) return false;
+    const activeTime = new Date(userObj.lastActiveAt).getTime();
+    return Date.now() - activeTime < 35000;
+  };
+
+  const handleToggleBan = async () => {
+    if (!targetUser) return;
+    try {
+      const res = await fetch(`/api/users/${targetUser.id}/ban`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setTargetUser(prev => prev ? { ...prev, isBanned: !!data.isBanned } : null);
+        alert(data.isBanned ? 'Пользователь успешно заблокирован в системе.' : 'Пользователь успешно разблокирован.');
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Ошибка при блокировке');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка связи с сервером');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
@@ -81,33 +113,68 @@ export default function MessagesPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  // In a real app we'd fetch contacts. Here we just fetch the curator or a target
+  // Synchronized loading and real-time interval polling to update dialogues instantly without refreshing
   useEffect(() => {
-    const initChat = async () => {
-      const idToChat = urlUserId || user?.curatorId;
-      if (!idToChat) {
-        setLoading(false);
-        return;
-      }
+    const idToChat = urlUserId || user?.curatorId;
+    if (!idToChat) {
+      setLoading(false);
+      return;
+    }
 
+    const initChat = async () => {
       try {
         const [userRes, messagesRes] = await Promise.all([
           fetch(`/api/users/${idToChat}`),
           fetch(`/api/messages/${idToChat}`)
         ]);
         
-        const userData = await userRes.json();
-        setTargetUser(userData);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setTargetUser(userData);
+        }
         
-        const messagesData = await messagesRes.json();
-        setMessages(messagesData.reverse());
+        if (messagesRes.ok) {
+          const messagesData = await messagesRes.json();
+          setMessages(messagesData.reverse());
+        }
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
+
     initChat();
+
+    // Setup 3 second polling interval for perfect message sync
+    const interval = setInterval(async () => {
+      try {
+        const [messagesRes, contactsRes] = await Promise.all([
+          fetch(`/api/messages/${idToChat}`),
+          fetch('/api/messages-contacts')
+        ]);
+
+        if (messagesRes.ok) {
+          const messagesData = await messagesRes.json();
+          const reversed = messagesData.reverse();
+          setMessages(prev => {
+            if (prev.length !== reversed.length || (prev.length > 0 && prev[prev.length - 1].id !== reversed[reversed.length - 1].id)) {
+              return reversed;
+            }
+            return prev;
+          });
+        }
+
+        if (contactsRes.ok) {
+          const contactsData = await contactsRes.json();
+          setContacts(contactsData);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [urlUserId, user?.curatorId]);
 
   useEffect(() => {
@@ -116,16 +183,69 @@ export default function MessagesPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !targetUser) return;
+    if ((!newMessage.trim() && !selectedFile) || !targetUser) return;
 
-    const content = newMessage;
+    let attachmentUrl = null;
+    let attachmentName = null;
+
+    if (selectedFile) {
+      setUploadingFile(true);
+      try {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(selectedFile);
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = error => reject(error);
+        });
+
+        const upRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: selectedFile.name,
+            fileType: selectedFile.type,
+            base64Data
+          })
+        });
+
+        if (upRes.ok) {
+          const upData = await upRes.json();
+          attachmentUrl = upData.fileUrl;
+          attachmentName = selectedFile.name;
+        } else {
+          alert('Ошибка при загрузке прикрепленного файла');
+          setUploadingFile(false);
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Не удалось загрузить файл');
+        setUploadingFile(false);
+        return;
+      } finally {
+        setUploadingFile(false);
+      }
+    }
+
+    const content = newMessage || `Отправил(а) файл: ${selectedFile?.name}`;
     setNewMessage('');
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiverId: targetUser.id, content })
+        body: JSON.stringify({ 
+          receiverId: targetUser.id, 
+          content,
+          attachmentUrl,
+          attachmentName
+        })
       });
       const data = await res.json();
       
@@ -134,6 +254,8 @@ export default function MessagesPage() {
         senderId: user!.id,
         receiverId: targetUser.id,
         content,
+        attachmentUrl,
+        attachmentName,
         createdAt: new Date().toISOString()
       };
       setMessages([...messages, newMsg]);
@@ -212,7 +334,10 @@ export default function MessagesPage() {
                     >
                       <div className="w-11 h-11 rounded-xl bg-indigo-600 overflow-hidden shrink-0 shadow-xs relative">
                         {contact.avatar ? <img src={contact.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-sm text-white">{contact.name[0]}</div>}
-                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-white dark:border-slate-950 rounded-full" />
+                        <div className={cn(
+                          "absolute bottom-0 right-0 w-2.5 h-2.5 border border-white dark:border-slate-950 rounded-full",
+                          isOnline(contact) ? "bg-emerald-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"
+                        )} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center mb-0.5">
@@ -253,19 +378,46 @@ export default function MessagesPage() {
                         <div className="md:hidden">
                             <Link to="/messages" className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"><ChevronRightIcon size={24} className="rotate-180" /></Link>
                         </div>
-                        <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm relative">
-                             {targetUser.avatar ? <img src={targetUser.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-indigo-600">{targetUser.name[0]}</div>}
-                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
-                        </div>
-                        <div>
-                            <h3 className="font-extrabold text-slate-900 dark:text-slate-100">{targetUser.name} {targetUser.surname}</h3>
-                            <span className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">В сети</span>
-                        </div>
+                        <Link to={`/profile/${targetUser.id}`} className="flex items-center space-x-4 hover:opacity-90 group transition-all">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm relative group-hover:border-indigo-500 transition-colors">
+                                 {targetUser.avatar ? <img src={targetUser.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black text-indigo-600">{targetUser.name[0]}</div>}
+                                 <div className={cn(
+                                   "absolute bottom-0 right-0 w-3 h-3 border-2 border-white dark:border-slate-900 rounded-full",
+                                   isOnline(targetUser) ? "bg-emerald-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"
+                                 )} />
+                            </div>
+                            <div>
+                                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors underline decoration-indigo-200 decoration-2 underline-offset-4">{targetUser.name} {targetUser.surname}</h3>
+                                {isOnline(targetUser) ? (
+                                  <span className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    В сети
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                    Не в сети
+                                  </span>
+                                )}
+                            </div>
+                        </Link>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <button className="p-3 text-slate-400 hover:text-indigo-600 transition-colors rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"><Phone size={20} /></button>
-                        <button className="p-3 text-slate-400 hover:text-indigo-600 transition-colors rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"><Video size={20} /></button>
-                        <button className="p-3 text-slate-400 hover:text-indigo-600 transition-colors rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"><MoreVertical size={20} /></button>
+                    <div className="flex items-center space-x-3">
+                        {['admin', 'curator', 'teacher'].includes(user?.role || '') && (
+                          <button 
+                            type="button"
+                            onClick={handleToggleBan}
+                            className={cn(
+                              "px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95",
+                              targetUser.isBanned 
+                                ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-100" 
+                                : "bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/20 dark:text-slate-200"
+                            )}
+                          >
+                            <ShieldAlert size={14} />
+                            <span>{targetUser.isBanned ? 'Разблокировать' : 'Заблокировать'}</span>
+                          </button>
+                        )}
                     </div>
                 </div>
 
@@ -288,6 +440,34 @@ export default function MessagesPage() {
                                         : "bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-tl-none"
                                 )}>
                                     <p className="font-medium">{msg.content}</p>
+                                    {msg.attachmentUrl && (
+                                        <div className="mt-3 p-1 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 max-w-sm">
+                                            {msg.attachmentUrl.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
+                                                <a href={msg.attachmentUrl} target="_blank" rel="referrer noopener">
+                                                    <img 
+                                                        src={msg.attachmentUrl} 
+                                                        alt={msg.attachmentName || 'Изображение'} 
+                                                        referrerPolicy="no-referrer"
+                                                        className="max-h-48 rounded-lg object-cover w-full hover:opacity-95 transition-opacity" 
+                                                    />
+                                                </a>
+                                            ) : (
+                                                <a 
+                                                    href={msg.attachmentUrl} 
+                                                    download={msg.attachmentName} 
+                                                    target="_blank"
+                                                    rel="referrer noopener"
+                                                    className="flex items-center gap-3 p-3 text-xs font-bold hover:underline text-indigo-600 dark:text-indigo-400"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-500">
+                                                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+                                                        <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+                                                    </svg>
+                                                    <span className="truncate max-w-[180px]">{msg.attachmentName || 'Файл'}</span>
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className={cn("flex items-center gap-1.5 mt-2.5 opacity-40", isMe ? "justify-end" : "justify-start")}>
                                         <span className="text-[10px] font-black tracking-widest uppercase">
                                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -303,13 +483,62 @@ export default function MessagesPage() {
 
                 {/* Input Area */}
                 <div className="p-8 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+                    {/* Animated File Attachment Preview */}
+                    {selectedFile && (
+                        <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-between border border-dashed border-indigo-200 dark:border-indigo-800">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-50 dark:bg-indigo-950 rounded-xl text-indigo-600 dark:text-indigo-400">
+                                    <Paperclip size={16} />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[220px]">{selectedFile.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-semibold uppercase">{Math.round(selectedFile.size / 1024)} KB</p>
+                                </div>
+                            </div>
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    setSelectedFile(null);
+                                    if (fileInputRef.current) fileInputRef.current.value = '';
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M18 6 6 18M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+
+                    {uploadingFile && (
+                        <div className="mb-3 text-xs font-bold text-indigo-600 animate-pulse flex items-center gap-2">
+                             <RefreshCcw size={12} className="animate-spin" />
+                             <span>Пожалуйста подождите, загружается файл...</span>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSendMessage} className="flex items-center space-x-4">
-                         <button type="button" className="p-4 text-slate-400 hover:text-indigo-600 transition-colors bg-slate-50 dark:bg-slate-800 rounded-2xl"><Paperclip size={24} /></button>
+                         <input 
+                             type="file" 
+                             ref={fileInputRef} 
+                             onChange={handleFileChange} 
+                             className="hidden" 
+                         />
+                         <button 
+                             type="button" 
+                             onClick={() => fileInputRef.current?.click()}
+                             className={cn(
+                               "p-4 text-slate-400 hover:text-indigo-600 transition-colors rounded-2xl shrink-0",
+                               selectedFile ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40" : "bg-slate-50 dark:bg-slate-800"
+                             )}
+                         >
+                             <Paperclip size={24} />
+                         </button>
                          <div className="flex-1 relative group">
                             <input 
                                 type="text" 
-                                className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-3xl pl-14 pr-6 py-5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner"
-                                placeholder="Напишите ответ..."
+                                className="w-full bg-slate-50 dark:bg-slate-800/50 border-none rounded-3xl pl-14 pr-6 py-5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-100 transition-all shadow-inner placeholder-slate-400 dark:text-white"
+                                placeholder={selectedFile ? "Добавьте комментарий к файлу..." : "Напишите ответ..."}
                                 value={newMessage}
                                 onChange={e => setNewMessage(e.target.value)}
                             />
@@ -317,7 +546,7 @@ export default function MessagesPage() {
                          </div>
                          <button 
                             type="submit"
-                            disabled={!newMessage.trim()}
+                            disabled={!newMessage.trim() && !selectedFile}
                             className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-100 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:shadow-none disabled:bg-slate-200 dark:disabled:bg-slate-800"
                          >
                             <Send size={24} />

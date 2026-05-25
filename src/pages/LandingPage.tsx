@@ -154,10 +154,10 @@ export default function LandingPage() {
           className="max-w-md"
         >
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl mb-10 flex items-center justify-center shadow-xl shadow-indigo-200">
-            <span className="text-white font-bold text-3xl">B</span>
+            <span className="text-white font-bold text-3xl">Э</span>
           </div>
           <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-8 tracking-tighter text-slate-900">
-            BotSupport<span className="text-indigo-600">.Edu</span>
+            Эмппати<span className="text-indigo-600"> курс</span>
           </h1>
           <p className="text-slate-500 text-xl mb-12 leading-relaxed font-medium">
             Профессиональная экосистема для развития навыков кураторства и проектирования диалоговых систем.
@@ -410,7 +410,7 @@ export default function LandingPage() {
           )}
 
           <p className="mt-8 text-center text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">
-            © 2026 BotSupport Platform
+            © 2026 Эмппати кураторская платформа
           </p>
         </motion.div>
       </div>

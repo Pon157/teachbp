@@ -10,7 +10,7 @@ import nodemailer from 'nodemailer';
 import dns from 'dns';
 import { v4 as uuidv4 } from 'uuid';
 import { db, initDb } from './src/lib/db.ts';
-import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks, profileComments } from './src/lib/schema.ts';
+import { users, courses, courseBlocks, notifications, messages, certificates, userProgress, homeworks, profileComments, blockDiscussions } from './src/lib/schema.ts';
 import { eq, and, or, desc, asc, ne, ilike } from 'drizzle-orm';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-123';
@@ -543,6 +543,46 @@ async function startServer() {
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: 'Ошибка сервера при публикации комментария' });
+    }
+  });
+
+  // --- Course Block Discussions ---
+  app.get('/api/blocks/:blockId/discussions', authenticate, async (req: any, res) => {
+    try {
+      const list = await db.select().from(blockDiscussions)
+        .where(eq(blockDiscussions.blockId, req.params.blockId))
+        .orderBy(asc(blockDiscussions.createdAt));
+      res.json(list);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json([]);
+    }
+  });
+
+  app.post('/api/blocks/:blockId/discussions', authenticate, async (req: any, res) => {
+    try {
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: 'Сообщение не может быть пустым' });
+      }
+      const poster = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!poster) return res.status(404).json({ error: 'User not found' });
+
+      const newId = uuidv4();
+      await db.insert(blockDiscussions).values({
+        id: newId,
+        blockId: req.params.blockId,
+        authorId: req.userId,
+        authorName: `${poster.name} ${poster.surname}`,
+        authorAvatar: poster.avatar,
+        content: content.trim(),
+        createdAt: new Date()
+      });
+
+      res.json({ message: 'Успешно отправлено', commentId: newId });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'ошибка сервера' });
     }
   });
 

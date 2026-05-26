@@ -111,6 +111,8 @@ export async function initDb() {
       author_name TEXT NOT NULL,
       author_avatar TEXT,
       content TEXT NOT NULL,
+      likes JSONB,
+      replies JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`
   ];
@@ -130,6 +132,8 @@ export async function initDb() {
       `ALTER TABLE user_progress ADD COLUMN IF NOT EXISTS feedback TEXT`,
       `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS likes JSONB`,
       `ALTER TABLE profile_comments ADD COLUMN IF NOT EXISTS replies JSONB`,
+      `ALTER TABLE block_discussions ADD COLUMN IF NOT EXISTS likes JSONB`,
+      `ALTER TABLE block_discussions ADD COLUMN IF NOT EXISTS replies JSONB`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW()`,

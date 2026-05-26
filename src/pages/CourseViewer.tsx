@@ -10,7 +10,8 @@ import {
   User as UserIcon,
   MessageSquare,
   RefreshCcw,
-  GraduationCap
+  GraduationCap,
+  Heart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Course, CourseBlock, User } from '../types';
@@ -35,6 +36,10 @@ export default function CourseViewer() {
   const [discussions, setDiscussions] = useState<any[]>([]);
   const [newDiscussionContent, setNewDiscussionContent] = useState('');
   const [discussionsLoading, setDiscussionsLoading] = useState(false);
+
+  // Discussion reply forms
+  const [replyInputMap, setReplyInputMap] = useState<Record<string, string>>({});
+  const [replySubmittingMap, setReplySubmittingMap] = useState<Record<string, boolean>>({});
 
   const fetchDiscussions = async (blockId: string) => {
     try {
@@ -67,6 +72,45 @@ export default function CourseViewer() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleLikeDiscussion = async (discussionId: string) => {
+    try {
+      const res = await fetch(`/api/discussions/${discussionId}/like`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDiscussions(prev => prev.map(d => d.id === discussionId ? { ...d, likes: data.likes } : d));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handlePostDiscussionReply = async (discussionId: string) => {
+    const text = replyInputMap[discussionId]?.trim();
+    if (!text) return;
+
+    setReplySubmittingMap(prev => ({ ...prev, [discussionId]: true }));
+    try {
+      const res = await fetch(`/api/discussions/${discussionId}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: text })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReplyInputMap(prev => ({ ...prev, [discussionId]: '' }));
+        setDiscussions(prev => prev.map(d => d.id === discussionId ? { ...d, replies: data.replies } : d));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setReplySubmittingMap(prev => ({ ...prev, [discussionId]: false }));
     }
   };
 
@@ -520,7 +564,8 @@ export default function CourseViewer() {
                   </div>
                 ) : (
                   discussions.map((comment) => (
-                    <div key={comment.id} className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/60 rounded-xl space-y-2">
+                    <div key={comment.id} className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/60 rounded-xl space-y-4">
+                      {/* Author Header */}
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0">
                           {comment.authorAvatar ? (
@@ -536,7 +581,63 @@ export default function CourseViewer() {
                           <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{new Date(comment.createdAt).toLocaleString()}</p>
                         </div>
                       </div>
+
+                      {/* Content */}
                       <p className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+
+                      {/* Likes count & Like button */}
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-200/40 dark:border-slate-850/40">
+                        <button 
+                          onClick={() => handleLikeDiscussion(comment.id)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide transition-all cursor-pointer",
+                            (Array.isArray(comment.likes) && comment.likes.includes(user?.id))
+                              ? "bg-rose-500/10 text-rose-500"
+                              : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850"
+                          )}
+                        >
+                          <Heart size={12} className="shrink-0" fill={(Array.isArray(comment.likes) && comment.likes.includes(user?.id)) ? "currentColor" : "none"} />
+                          <span>{Array.isArray(comment.likes) ? comment.likes.length : 0} Лайков</span>
+                        </button>
+                      </div>
+
+                      {/* Nested Replies List */}
+                      {Array.isArray(comment.replies) && comment.replies.length > 0 && (
+                        <div className="space-y-3 pl-3 border-l-2 border-slate-200 dark:border-slate-800/80 mt-2">
+                          {comment.replies.map((reply: any) => (
+                            <div key={reply.id} className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-extrabold text-[10px] text-slate-900 dark:text-slate-100">{reply.authorName}</span>
+                                <span className="text-[8px] text-slate-400 dark:text-slate-500 font-extrabold uppercase tracking-wider">{new Date(reply.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium leading-relaxed">{reply.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply Form */}
+                      <div className="flex gap-1.5 items-stretch pt-2">
+                        <input 
+                          type="text"
+                          placeholder="Ответить..."
+                          value={replyInputMap[comment.id] || ''}
+                          onChange={e => setReplyInputMap({ ...replyInputMap, [comment.id]: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              handlePostDiscussionReply(comment.id);
+                            }
+                          }}
+                          className="flex-1 text-[11px] bg-slate-100/50 dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800/60 rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400"
+                        />
+                        <button
+                          onClick={() => handlePostDiscussionReply(comment.id)}
+                          disabled={replySubmittingMap[comment.id] || !replyInputMap[comment.id]?.trim()}
+                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black uppercase text-[8px] tracking-wider rounded-lg transition-all cursor-pointer text-center shrink-0"
+                        >
+                          {replySubmittingMap[comment.id] ? <RefreshCcw size={8} className="animate-spin" /> : 'Ответ'}
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -576,8 +677,8 @@ export default function CourseViewer() {
           font-size: 1.125rem;
           line-height: 1.85;
           color: #334155;
-          word-wrap: normal;
-          overflow-wrap: normal;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
           word-break: normal;
           hyphens: none;
           -webkit-hyphens: none;
@@ -616,6 +717,15 @@ export default function CourseViewer() {
           font-size: 1.125rem;
           line-height: 1.85;
           color: #334155;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          word-break: normal;
+        }
+        .course-content-article li,
+        .course-content-article td {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          word-break: normal;
         }
         .dark .course-content-article p {
           color: #cbd5e1;

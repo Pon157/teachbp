@@ -25,6 +25,7 @@ import {
   CornerDownRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { AnimatePresence, motion } from 'motion/react';
 
 export default function ProfilePage() {
   const { userId } = useParams<{ userId?: string }>();

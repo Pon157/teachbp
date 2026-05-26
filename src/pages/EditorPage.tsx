@@ -57,7 +57,13 @@ export default function EditorPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
   const [activeBlockId, setActiveBlockId] = useState<string>('1');
+
+  const showError = (msg: string) => {
+    setErrorText(msg);
+    setTimeout(() => setErrorText(null), 4000);
+  };
   const [showSettings, setShowSettings] = useState(false);
   const [showBlocksMenu, setShowBlocksMenu] = useState(false);
 
@@ -199,7 +205,7 @@ export default function EditorPage() {
   };
 
   const saveCourse = async () => {
-    if (!courseTitle) return alert('Укажите название курса');
+    if (!courseTitle) return showError('Укажите название курса');
     setLoading(true);
     setSuccess(false);
     try {
@@ -221,22 +227,15 @@ export default function EditorPage() {
       const courseData = await courseRes.json();
       const finalId = id || courseData.id;
 
-      // For simplicity, we recreate blocks on save or we update them.
-      // Easiest for MVP is to delete old blocks and insert new ones if editing,
-      // but that risks data loss if the insert fails. 
-      // Better: Use the API we have.
-      
-      // Let's assume the API handles it or add more routes if needed.
-      // Currently server.ts has: POST /api/courses/:id/blocks
-      // I'll update it to clear blocks first if editing.
-      
       if (id) {
           // Tell server to clear blocks if editing
-          await fetch(`/api/courses/${finalId}/clear-blocks`, { method: 'POST' });
+          const clearRes = await fetch(`/api/courses/${finalId}/clear-blocks`, { method: 'POST' });
+          if (!clearRes.ok) throw new Error('Failed to clear old course blocks');
       }
 
-      const blockPromises = blocks.map(block => 
-        fetch(`/api/courses/${finalId}/blocks`, {
+      // Save blocks sequentially to prevent SQLite/Postgres write overlaps or lock errors
+      for (const block of blocks) {
+        const blockRes = await fetch(`/api/courses/${finalId}/blocks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -245,16 +244,17 @@ export default function EditorPage() {
             order: block.order,
             tasks: block.tasks
           })
-        })
-      );
-      
-      await Promise.all(blockPromises);
+        });
+        if (!blockRes.ok) {
+          throw new Error(`Failed to save block: ${block.title}`);
+        }
+      }
 
       setSuccess(true);
       setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err) {
       console.error(err);
-      alert('Ошибка при сохранении курса');
+      showError('Ошибка при сохранении курса. Попробуйте еще раз.');
     } finally {
       setLoading(false);
     }
@@ -266,6 +266,20 @@ export default function EditorPage() {
 
   return (
     <div className="fixed inset-0 bg-white dark:bg-slate-950 z-50 flex flex-col overflow-hidden">
+      {/* Absolute Error Notification */}
+      <AnimatePresence>
+        {errorText && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] bg-rose-500 text-white font-bold text-xs sm:text-sm px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-rose-400"
+          >
+            <span className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+            <span>{errorText}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Top Bar */}
       <header className="h-20 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-8 shrink-0 bg-white dark:bg-slate-950">
         <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">

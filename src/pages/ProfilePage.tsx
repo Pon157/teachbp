@@ -843,12 +843,12 @@ export default function ProfilePage() {
                     ))}
 
                     {/* Reply Form */}
-                    <div className="flex gap-2 items-center pt-2">
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center pt-2">
                        <input 
                          type="text"
                          placeholder="Ответить в гостевой книге..."
                          value={replyInputMap[comment.id] || ''}
-                         className="flex-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-505 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400"
+                         className="flex-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder-slate-400"
                          onChange={e => setReplyInputMap({ ...replyInputMap, [comment.id]: e.target.value })}
                          onKeyDown={e => {
                             if (e.key === 'Enter') {
@@ -859,7 +859,7 @@ export default function ProfilePage() {
                        <button
                          onClick={() => handlePostReply(comment.id)}
                          disabled={replySubmittingMap[comment.id]}
-                         className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black uppercase text-[9px] tracking-widest rounded-lg transition-all cursor-pointer"
+                         className="px-3.5 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black uppercase text-[9px] tracking-widest rounded-lg transition-all cursor-pointer text-center shrink-0"
                        >
                           {replySubmittingMap[comment.id] ? <RefreshCcw size={10} className="animate-spin" /> : 'Ответ'}
                        </button>

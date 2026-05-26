@@ -231,26 +231,23 @@ export default function CourseViewer() {
           </div>
 
           {/* Article Content */}
-          <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 p-4 sm:p-8 md:p-14 rounded-2xl sm:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <article 
-              className="prose prose-slate dark:prose-invert max-w-none break-words overflow-x-auto max-w-full
-                prose-h2:text-3xl prose-h2:font-black prose-h2:tracking-tight 
-                prose-p:text-xl prose-p:leading-relaxed prose-p:text-slate-900 dark:prose-p:text-slate-200
-                prose-img:rounded-[2.5rem] prose-img:shadow-2xl prose-img:shadow-slate-100
-                prose-blockquote:border-l-4 prose-blockquote:border-indigo-600 prose-blockquote:bg-slate-50 dark:prose-blockquote:bg-slate-800/50 prose-blockquote:p-8 prose-blockquote:rounded-r-2xl prose-blockquote:italic prose-blockquote:font-medium prose-blockquote:text-slate-800 dark:prose-blockquote:text-slate-200"
+              lang="ru"
+              className="course-content-article max-w-none break-words overflow-x-auto max-w-full"
               dangerouslySetInnerHTML={{ __html: currentBlock?.content || '' }}
             />
           </div>
 
           {/* Homework Section */}
-          <div className="bg-white dark:bg-zinc-900 rounded-[3rem] p-10 md:p-16 text-slate-900 dark:text-white relative overflow-hidden shadow-xl border border-slate-200 dark:border-zinc-800">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-[3rem] p-4 sm:p-10 md:p-16 text-slate-900 dark:text-white relative overflow-hidden shadow-xl border border-slate-200 dark:border-zinc-800">
             <div className="absolute top-0 right-0 p-8 opacity-5 dark:opacity-10 pointer-events-none">
                 <GraduationCap className="w-32 h-32 text-indigo-500" />
             </div>
             
             <div className="relative z-10 space-y-12">
-              <h2 className="text-3xl font-black mb-8 flex items-center gap-4 text-slate-900 dark:text-white">
-                <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white">
+              <h2 className="text-2xl sm:text-3xl font-black mb-8 flex items-center gap-4 text-slate-900 dark:text-white">
+                <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center text-white bg-indigo-600">
                   <Send size={20} />
                 </div>
                 <span>Практика</span>
@@ -299,7 +296,7 @@ export default function CourseViewer() {
                     </div>
 
                     {task.type === 'quiz' ? (
-                       <div className="space-y-4 ml-12">
+                       <div className="space-y-4 pl-4 sm:pl-12">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                              {(() => {
                                const opts = typeof task.options === 'string'
@@ -352,12 +349,14 @@ export default function CourseViewer() {
                           )}
                        </div>
                     ) : (
-                        <textarea 
-                            className="w-full min-h-[150px] bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-[2rem] p-8 text-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-600 ml-12"
-                            placeholder="Опишите свое решение здесь..."
-                            value={homeworkResponses[task.id] || ''}
-                            onChange={e => setHomeworkResponses({ ...homeworkResponses, [task.id]: e.target.value })}
-                        />
+                        <div className="pl-4 sm:pl-12 w-full">
+                            <textarea 
+                                className="w-full min-h-[140px] bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl sm:rounded-[2rem] p-4 sm:p-8 text-sm sm:text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                                placeholder="Опишите свое решение здесь..."
+                                value={homeworkResponses[task.id] || ''}
+                                onChange={e => setHomeworkResponses({ ...homeworkResponses, [task.id]: e.target.value })}
+                            />
+                        </div>
                     )}
                   </div>
                 ))}
@@ -413,6 +412,124 @@ export default function CourseViewer() {
             <MessageSquare size={20} />
           </button>
       </div>
+
+      <style>{`
+        .course-content-article {
+          font-size: 1.125rem;
+          line-height: 1.85;
+          color: #334155;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          word-break: break-word;
+          hyphens: auto;
+          -webkit-hyphens: auto;
+          -ms-hyphens: auto;
+        }
+        .dark .course-content-article {
+          color: #cbd5e1;
+        }
+
+        .course-content-article h1,
+        .course-content-article h2,
+        .course-content-article h3,
+        .course-content-article h4 {
+          color: #0f172a;
+          font-weight: 850;
+          letter-spacing: -0.025em;
+          line-height: 1.25;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+        }
+        .dark .course-content-article h1,
+        .dark .course-content-article h2,
+        .dark .course-content-article h3,
+        .dark .course-content-article h4 {
+          color: #f8fafc;
+        }
+
+        .course-content-article h1 { font-size: 2.25rem; }
+        .course-content-article h2 { font-size: 1.875rem; }
+        .course-content-article h3 { font-size: 1.5rem; }
+        .course-content-article h4 { font-size: 1.25rem; }
+
+        .course-content-article p {
+          margin-top: 0;
+          margin-bottom: 1.5rem;
+          font-size: 1.125rem;
+          line-height: 1.85;
+          color: #334155;
+        }
+        .dark .course-content-article p {
+          color: #cbd5e1;
+        }
+
+        .course-content-article blockquote {
+          border-left: 4px solid #4f46e5;
+          background-color: #f8fafc;
+          padding: 1.5rem 2rem;
+          margin: 2rem 0;
+          border-radius: 0 1.5rem 1.5rem 0;
+          font-style: italic;
+          font-weight: 500;
+          color: #1e293b;
+        }
+        .dark .course-content-article blockquote {
+          background-color: rgba(30, 41, 59, 0.4);
+          color: #f1f5f9;
+          border-left-color: #6366f1;
+        }
+
+        .course-content-article ul,
+        .course-content-article ol {
+          margin-top: 0;
+          margin-bottom: 1.5rem;
+          padding-left: 1.75rem;
+        }
+        .course-content-article ul {
+          list-style-type: disc;
+        }
+        .course-content-article ol {
+          list-style-type: decimal;
+        }
+        .course-content-article li {
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
+        }
+
+        .course-content-article a {
+          color: #4f46e5;
+          text-decoration: underline;
+          font-weight: 600;
+          transition: color 0.15s ease-in-out;
+        }
+        .course-content-article a:hover {
+          color: #4338ca;
+        }
+        .dark .course-content-article a {
+          color: #818cf8;
+        }
+        .dark .course-content-article a:hover {
+          color: #a5b4fc;
+        }
+
+        .course-content-article strong,
+        .course-content-article b {
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .dark .course-content-article strong,
+        .dark .course-content-article b {
+          color: #ffffff;
+        }
+
+        .course-content-article img {
+          border-radius: 2rem;
+          max-width: 100%;
+          height: auto;
+          margin: 2.5rem auto;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+      `}</style>
     </div>
   );
 }

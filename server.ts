@@ -586,6 +586,78 @@ async function startServer() {
     }
   });
 
+  app.post('/api/discussions/:id/like', authenticate, async (req: any, res) => {
+    try {
+      const discussionId = req.params.id;
+      const discussion = (await db.select().from(blockDiscussions).where(eq(blockDiscussions.id, discussionId)).limit(1))[0];
+      if (!discussion) return res.status(404).json({ error: 'Discussion comment not found' });
+
+      let likesList: string[] = [];
+      if (discussion.likes && Array.isArray(discussion.likes)) {
+        likesList = discussion.likes as string[];
+      } else if (typeof discussion.likes === 'string') {
+        try {
+          likesList = JSON.parse(discussion.likes);
+        } catch (e) {}
+      }
+
+      const index = likesList.indexOf(req.userId);
+      if (index > -1) {
+        likesList.splice(index, 1);
+      } else {
+        likesList.push(req.userId);
+      }
+
+      await db.update(blockDiscussions).set({ likes: likesList }).where(eq(blockDiscussions.id, discussionId));
+      res.json({ success: true, likes: likesList });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'ошибка сервера' });
+    }
+  });
+
+  app.post('/api/discussions/:id/reply', authenticate, async (req: any, res) => {
+    try {
+      const discussionId = req.params.id;
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: 'Ответ не может быть пустым' });
+      }
+
+      const discussion = (await db.select().from(blockDiscussions).where(eq(blockDiscussions.id, discussionId)).limit(1))[0];
+      if (!discussion) return res.status(404).json({ error: 'Discussion comment not found' });
+
+      const poster = (await db.select().from(users).where(eq(users.id, req.userId)).limit(1))[0];
+      if (!poster) return res.status(404).json({ error: 'User not found' });
+
+      let repliesList: any[] = [];
+      if (discussion.replies && Array.isArray(discussion.replies)) {
+        repliesList = discussion.replies as any[];
+      } else if (typeof discussion.replies === 'string') {
+        try {
+          repliesList = JSON.parse(discussion.replies);
+        } catch (e) {}
+      }
+
+      const newReply = {
+        id: uuidv4(),
+        authorId: req.userId,
+        authorName: `${poster.name} ${poster.surname}`,
+        authorAvatar: poster.avatar,
+        content: content.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      repliesList.push(newReply);
+
+      await db.update(blockDiscussions).set({ replies: repliesList }).where(eq(blockDiscussions.id, discussionId));
+      res.json({ success: true, replies: repliesList });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'ошибка сервера' });
+    }
+  });
+
   app.post('/api/comments/:id/like', authenticate, async (req: any, res) => {
     try {
       const commentId = req.params.id;

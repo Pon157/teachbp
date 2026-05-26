@@ -97,3 +97,14 @@ export const profileComments = pgTable('profile_comments', {
   replies: jsonb('replies'), // JSON array of replies: [{ id, authorId, authorName, authorAvatar, content, createdAt }]
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const blockDiscussions = pgTable('block_discussions', {
+  id: text('id').primaryKey(),
+  blockId: text('block_id').notNull().references(() => courseBlocks.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  authorName: text('author_name').notNull(),
+  authorAvatar: text('author_avatar'),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+

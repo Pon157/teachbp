@@ -103,6 +103,15 @@ export async function initDb() {
       author_avatar TEXT,
       content TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS block_discussions (
+      id TEXT PRIMARY KEY,
+      block_id TEXT NOT NULL,
+      author_id TEXT NOT NULL,
+      author_name TEXT NOT NULL,
+      author_avatar TEXT,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`
   ];
 

@@ -30,6 +30,46 @@ export default function CourseViewer() {
   const [completedBlocks, setCompletedBlocks] = useState<string[]>([]);
   const [progressList, setProgressList] = useState<any[]>([]);
 
+  // Discussions sidebar states
+  const [showDiscussions, setShowDiscussions] = useState(false);
+  const [discussions, setDiscussions] = useState<any[]>([]);
+  const [newDiscussionContent, setNewDiscussionContent] = useState('');
+  const [discussionsLoading, setDiscussionsLoading] = useState(false);
+
+  const fetchDiscussions = async (blockId: string) => {
+    try {
+      setDiscussionsLoading(true);
+      const res = await fetch(`/api/blocks/${blockId}/discussions`);
+      if (res.ok) {
+        setDiscussions(await res.json());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDiscussionsLoading(false);
+    }
+  };
+
+  const handlePostDiscussion = async () => {
+    if (!newDiscussionContent.trim() || !course?.blocks?.[currentBlockIndex]) return;
+    const blockId = course.blocks[currentBlockIndex].id;
+    try {
+      const res = await fetch(`/api/blocks/${blockId}/discussions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: newDiscussionContent })
+      });
+      if (res.ok) {
+        setNewDiscussionContent('');
+        await fetchDiscussions(blockId);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const fetchCourseData = async () => {
     try {
         const [courseRes, progressRes] = await Promise.all([
@@ -78,6 +118,13 @@ export default function CourseViewer() {
       }
     }
   }, [currentBlockIndex, course, progressList]);
+
+  // Fetch discussions when current block changes or discussions sidebar is opened
+  useEffect(() => {
+    if (course?.blocks?.[currentBlockIndex] && showDiscussions) {
+      fetchDiscussions(course.blocks[currentBlockIndex].id);
+    }
+  }, [currentBlockIndex, showDiscussions, course]);
 
   const handleCompleteBlock = async () => {
     setSubmitting(true);
@@ -234,7 +281,7 @@ export default function CourseViewer() {
           <div className="bg-white dark:bg-slate-900 p-4 sm:p-8 md:p-14 rounded-2xl sm:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm">
             <article 
               lang="ru"
-              className="course-content-article max-w-none break-words overflow-x-auto max-w-full"
+              className="course-content-article max-w-none overflow-x-auto max-w-full"
               dangerouslySetInnerHTML={{ __html: currentBlock?.content || '' }}
             />
           </div>
@@ -408,18 +455,129 @@ export default function CourseViewer() {
             ))}
           </div>
           <div className="w-px h-8 bg-slate-200 dark:bg-slate-800" />
-          <button className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+          <button 
+            onClick={() => setShowDiscussions(!showDiscussions)}
+            className={cn(
+              "w-10 h-10 flex items-center justify-center rounded-xl transition-all relative",
+              showDiscussions 
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100 dark:shadow-none" 
+                : "text-slate-500 hover:bg-slate-50 hover:text-indigo-600 dark:hover:bg-slate-800"
+            )}
+          >
             <MessageSquare size={20} />
+            {discussions.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-indigo-500 text-[8px] font-black text-white flex items-center justify-center border border-white dark:border-slate-900 leading-none">
+                {discussions.length}
+              </span>
+            )}
           </button>
       </div>
+
+      {/* Block Discussions Slide-over Drawer */}
+      <AnimatePresence>
+        {showDiscussions && (
+          <>
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.3 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDiscussions(false)}
+              className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-40 transition-all cursor-pointer"
+            />
+
+            {/* Panel */}
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl z-50 flex flex-col font-sans"
+            >
+              {/* Drawer header */}
+              <div className="p-6 border-b border-slate-250 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <MessageSquare size={20} className="text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider text-xs">Обсуждение урока</h3>
+                </div>
+                <button 
+                  onClick={() => setShowDiscussions(false)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition-colors cursor-pointer text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Discussions List */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {discussionsLoading ? (
+                  <div className="h-full flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-slate-400 animate-pulse">Загрузка комментариев...</div>
+                ) : discussions.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 opacity-60">
+                    <MessageSquare size={36} className="text-slate-300 dark:text-slate-700 mx-auto" />
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Здесь пока тихо</p>
+                    <p className="text-xs text-slate-400 font-medium">Будьте первым, кто задаст вопрос или поделится мнением по этому уроку!</p>
+                  </div>
+                ) : (
+                  discussions.map((comment) => (
+                    <div key={comment.id} className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800/60 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 shrink-0">
+                          {comment.authorAvatar ? (
+                            <img src={comment.authorAvatar} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <UserIcon size={14} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">{comment.authorName}</p>
+                          <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">{new Date(comment.createdAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Send discussion form footer */}
+              <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex items-center gap-2">
+                  <textarea 
+                    value={newDiscussionContent}
+                    onChange={(e) => setNewDiscussionContent(e.target.value)}
+                    placeholder="Напишите ваш комментарий или вопрос куратору..."
+                    className="flex-1 bg-white dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl p-3 text-xs font-medium outline-none resize-none h-14 focus:ring-1 focus:ring-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handlePostDiscussion();
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={handlePostDiscussion}
+                    disabled={!newDiscussionContent.trim()}
+                    className="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 shrink-0 shadow-lg shadow-indigo-100 dark:shadow-none animate-none"
+                  >
+                    <Send size={16} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <style>{`
         .course-content-article {
           font-size: 1.125rem;
           line-height: 1.85;
           color: #334155;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
+          word-wrap: normal;
+          overflow-wrap: normal;
           word-break: normal;
           hyphens: none;
           -webkit-hyphens: none;

@@ -49,6 +49,12 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // Guestbook comments
   const [comments, setComments] = useState<any[]>([]);
@@ -161,7 +167,7 @@ export default function ProfilePage() {
         }
       } else {
         const err = await res.json();
-        alert(err.error || 'Ошибка при отправке сообщения');
+        showToast(err.error || 'Ошибка при отправке сообщения');
       }
     } catch (err) {
       console.error(err);
@@ -323,11 +329,11 @@ export default function ProfilePage() {
                    textArea.select();
                    try {
                        document.execCommand('copy');
-                       alert('Ссылка на профиль скопирована!');
+                       showToast('Ссылка на профиль скопирована!');
                    } catch (err) {
                        try {
                            navigator.clipboard.writeText(link);
-                           alert('Ссылка на профиль скопирована!');
+                           showToast('Ссылка на профиль скопирована!');
                        } catch (e) {
                            prompt('Скопируйте ссылку вручную:', link);
                        }
@@ -343,14 +349,14 @@ export default function ProfilePage() {
              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Дата регистрации: {new Date(profileUser.createdAt).toLocaleDateString()}</p>
           </div>
 
-          <div className="flex md:flex-col gap-4">
-            <div className="p-6 bg-white/5 border border-white/10 backdrop-blur-sm rounded-[1.5rem] text-center min-w-[130px]">
-               <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">Опыт (XP)</p>
-               <p className="text-2xl font-black tracking-tighter text-indigo-300">{stats.xp}</p>
+          <div className="grid grid-cols-2 md:flex md:flex-col gap-4 w-full md:w-auto shrink-0">
+            <div className="p-4 sm:p-6 bg-white/5 border border-white/10 backdrop-blur-md rounded-[1.5rem] text-center min-w-[110px] sm:min-w-[130px]">
+               <p className="text-[9px] sm:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-1 font-sans">Опыт (XP)</p>
+               <p className="text-xl sm:text-2xl font-black tracking-tighter text-indigo-300 font-mono">{stats.xp}</p>
             </div>
-            <div className="p-6 bg-white/5 border border-white/10 backdrop-blur-sm rounded-[1.5rem] text-center min-w-[130px]">
-               <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-widest mb-1">Создано курсов</p>
-               <p className="text-2xl font-black tracking-tighter text-emerald-300">{stats.createdCourses || 0}</p>
+            <div className="p-4 sm:p-6 bg-white/5 border border-white/10 backdrop-blur-md rounded-[1.5rem] text-center min-w-[110px] sm:min-w-[130px]">
+               <p className="text-[9px] sm:text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mb-1 font-sans">Создано курсов</p>
+               <p className="text-xl sm:text-2xl font-black tracking-tighter text-emerald-300 font-mono">{stats.createdCourses || 0}</p>
             </div>
           </div>
         </div>
@@ -358,7 +364,7 @@ export default function ProfilePage() {
 
       {/* Tabs Menu (Only shown on own profile to toggle settings) */}
       {isOwnProfile && (
-        <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800 pb-px">
+        <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800 pb-px overflow-x-auto whitespace-nowrap scrollbar-none [mask-image:linear-gradient(to_right,white_85%,transparent)] md:[mask-image:none]">
           <button 
              onClick={() => setActiveTab('profile')}
              className={cn(
@@ -510,7 +516,7 @@ export default function ProfilePage() {
                                  onClick={() => {
                                    try {
                                      navigator.clipboard.writeText(verificationUrl);
-                                     alert('Ссылка скопирована!');
+                                     showToast('Ссылка скопирована!');
                                    } catch (e) {
                                      const textArea = document.createElement("textarea");
                                      textArea.value = verificationUrl;
@@ -520,7 +526,7 @@ export default function ProfilePage() {
                                      textArea.select();
                                      document.execCommand('copy');
                                      document.body.removeChild(textArea);
-                                     alert('Ссылка скопирована!');
+                                     showToast('Ссылка скопирована!');
                                    }
                                  }}
                                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all border border-slate-200 dark:border-slate-750"
@@ -868,6 +874,21 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+
+      {/* Floating Action Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 50, x: "-50%" }}
+            className="fixed bottom-6 left-1/2 z-50 bg-indigo-900 border border-indigo-700 text-white font-black tracking-wide text-xs px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md bg-opacity-95"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

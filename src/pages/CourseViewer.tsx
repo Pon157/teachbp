@@ -420,10 +420,10 @@ export default function CourseViewer() {
           color: #334155;
           word-wrap: break-word;
           overflow-wrap: break-word;
-          word-break: break-word;
-          hyphens: auto;
-          -webkit-hyphens: auto;
-          -ms-hyphens: auto;
+          word-break: normal;
+          hyphens: none;
+          -webkit-hyphens: none;
+          -ms-hyphens: none;
         }
         .dark .course-content-article {
           color: #cbd5e1;

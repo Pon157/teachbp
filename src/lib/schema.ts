@@ -105,6 +105,8 @@ export const blockDiscussions = pgTable('block_discussions', {
   authorName: text('author_name').notNull(),
   authorAvatar: text('author_avatar'),
   content: text('content').notNull(),
+  likes: jsonb('likes'), // JSON array of user IDs who liked
+  replies: jsonb('replies'), // JSON array of replies: [{ id, authorId, authorName, authorAvatar, content, createdAt }]
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
